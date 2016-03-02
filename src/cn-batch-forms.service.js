@@ -3,11 +3,12 @@
       .module('cn.batch-forms')
       .factory('cnBatchForms', cnBatchForms);
 
-  cnBatchForms.$inject = ['cnFlexFormService'];
-  function cnBatchForms(cnFlexFormService) {
+  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes'];
+  function cnBatchForms(cnFlexFormService, cnFlexFormTypes) {
     var fieldTypeHandlers = {
       'string': processString,
-      'cn-autocomplete': processSelect
+      'cn-autocomplete': processSelect,
+      'cn-datetimepicker': processDate
     };
 
     return {
@@ -27,8 +28,10 @@
     function BatchForms() {
       return Object.create({
         constructor,
+        createBatchField,
+        processForm,
         processField,
-        postProcessField,
+        processDate,
         processHidden,
         processString,
         processSelect,
@@ -42,13 +45,25 @@
       this.models = models;
 
       if(schema.forms) {
-        schema.forms.forEach(form => form.forEach(this.processField));
+        schema.forms.forEach(this.processForm);
       }
       else {
-        schema.form.forEach(this.processField);
+        this.processForm(schema.form);
       }
 
       return this;
+    }
+
+    function processForm(form) {
+      let i = form.items.length;
+      while(i) {
+        let field = form.items[i - 1];
+        this.processField(field);
+        if(field.batchConfig) {
+          let batchField = this.createBatchField(field);
+          form.items.splice(i, 0, batchField);
+        }
+      }
     }
 
     function processField(field) {
@@ -59,15 +74,14 @@
       if(field.key) {
         field.schema = field.schema || cnFlexFormService.getSchema(field);
 
-        var fieldType = cnFlexFormTypes.getFieldType(field);
-        var handler = fieldTypeHandlers[fieldType];
+        let fieldType = cnFlexFormTypes.getFieldType(field);
+        let handler = fieldTypeHandlers[fieldType];
 
         if(handler) {
           if(!_.isObject(field.batchConfig)) field.batchConfig = {};
           field.batchConfig.ogValues = this.getModelValues(field);
 
           handler.bind(this)(field);
-          this.postProcessField(field);
         }
         else {
           this.processHidden(field);
@@ -75,13 +89,23 @@
         }
       }
       else if(field.items) {
-        field.items.forEach(this.processField);
+        this.processForm(field);
       }
     }
 
-    function postProcessField(field) {
-
-
+    function createBatchField(field) {
+      return {
+        type: 'radiobuttons',
+        titleMap: field.batchConfig.titleMap,
+        watch: {
+          resolution: field.batchConfig.onSelect
+        },
+        key: `$$batch$$.${field.key}`,
+        schema: {
+          type: 'string',
+          title: 'Edit Mode'
+        }
+      };
     }
 
     function getModelValues(field) {
@@ -112,7 +136,7 @@
     }
 
     function processSelect(field) {
-      var type = field.schema.type;
+      let type = field.schema.type;
 
       if(type === 'array') {
         field.batchConfig.titleMap = field.batchConfig.titleMap || [{
@@ -138,7 +162,7 @@
             }
           },
           remove: () => {
-            var val = _.chain(field.batchConfig.ogValues).flatten().uniq().value();
+            let val = _.chain(field.batchConfig.ogValues).flatten().uniq().value();
             cnFlexFormService.parseExpression(field.key, this.model).set(val);
           }
         };
@@ -151,7 +175,7 @@
 
         field.batchConfig.onSelect = {
           replace: (prev) => {
-            var first = _.first(field.batchConfig.ogValues);
+            let first = _.first(field.batchConfig.ogValues);
             if(_.every(field.batchConfig.ogValues, first)) {
               field.placeholder = first[field.displayProperty || 'name'];
             }
@@ -167,6 +191,10 @@
           field.batchConfig.onSelect[val](prev);
         }
       };
+    }
+
+    function processDate(field) {
+
     }
   }
 
