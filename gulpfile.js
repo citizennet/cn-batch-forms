@@ -2,12 +2,13 @@
 var gulp = require('gulp');
 
 // Include Our Plugins
-var jshint = require('gulp-jshint');
-var sourcemaps = require('gulp-sourcemaps');
-var babel = require('gulp-babel');
-var concat = require('gulp-concat');
-var rename = require('gulp-rename');
-var uglify = require('gulp-uglify');
+var jshint        = require('gulp-jshint');
+var sourcemaps    = require('gulp-sourcemaps');
+var babel         = require('gulp-babel');
+var concat        = require('gulp-concat');
+var rename        = require('gulp-rename');
+var uglify        = require('gulp-uglify');
+var templateCache = require('gulp-angular-templatecache');
 
 // Lint Task
 gulp.task('lint', function() {
@@ -21,8 +22,17 @@ gulp.task('lint', function() {
       .pipe(jshint.reporter('default'));
 });
 
-// Concatenate & Transpile JS
+// Add templates to templateCache
+gulp.task('templates', function() {
+  return gulp.src('src/templates/*.html')
+      .pipe(templateCache({
+        root: 'cn-batch-forms',
+        module: 'cn.batch-forms'
+      }))
+      .pipe(gulp.dest('src'));
+});
 
+// Concatenate & Transpile JS
 gulp.task('scripts', function () {
   return gulp.src('src/*.js')
       .pipe(sourcemaps.init())
@@ -37,8 +47,12 @@ gulp.task('scripts', function () {
 
 // Watch Files For Changes
 gulp.task('watch', function() {
-  gulp.watch('src/*.js', ['lint', 'scripts']);
+  gulp.watch(['src/templates/*.html', 'src/*.js'], ['lint', 'templates', 'scripts']);
 });
 
+// Build Task
+gulp.task('build', ['lint', 'templates', 'scripts']);
+
+
 // Default Task
-gulp.task('default', ['lint', 'scripts', 'watch']);
+gulp.task('default', ['build', 'watch']);

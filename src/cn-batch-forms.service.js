@@ -3,8 +3,24 @@
       .module('cn.batch-forms')
       .factory('cnBatchForms', cnBatchForms);
 
-  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes'];
-  function cnBatchForms(cnFlexFormService, cnFlexFormTypes) {
+  cnBatchForms.$inject = [
+    'cnFlexFormService',
+    'cnFlexFormTypes',
+    'sfPath',
+    '$rootScope',
+    '$state',
+    '$timeout',
+    'cnFlexFormModalLoaderService'
+  ];
+  function cnBatchForms(
+      cnFlexFormService,
+      cnFlexFormTypes,
+      sfPath,
+      $rootScope,
+      $state,
+      $timeout,
+      cnFlexFormModalLoaderService) {
+
     var fieldTypeHandlers = {
       'string': processString,
       'cn-autocomplete': processSelect,
@@ -22,57 +38,115 @@
 
       var service = BatchForms(schema, model, models);
 
-      return service.schema;
+      return service;
     }
 
-    function BatchForms() {
+    function BatchForms(schema, model, models) {
       return Object.create({
         constructor,
+        addToSchema,
+        clearDefaults,
+        clearSchemaDefault,
+        closeModal,
+        createDirtyCheck,
         createBatchField,
+        onFieldScope,
         processForm,
         processField,
+        processItems,
         processDate,
-        processHidden,
         processString,
         processSelect,
-        getModelValues
-      }).constructor();
+        getModelValues,
+        getChangedModels,
+        setValue,
+        showResults
+      }).constructor(schema, model, models);
     }
 
     function constructor(schema, model, models) {
+      console.log('BatchForms:', schema, model, models);
+
+      cnFlexFormModalLoaderService.resolveMapping('results', 0, this);
+
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.fieldRegister = {};
+
+      this.clearDefaults();
 
       if(schema.forms) {
-        schema.forms.forEach(this.processForm);
+        let i = schema.forms.length - 1;
+        while(i > -1) {
+          this.processForm(schema.forms[i]);
+          if(!schema.forms[i].form.length) {
+            schema.forms.splice(i, 1);
+          }
+          --i;
+        }
+        //schema.forms.forEach(this.processForm.bind(this));
       }
       else {
         this.processForm(schema.form);
       }
 
+      $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
+
+      console.log('BatchDone:', schema, model, models);
+
       return this;
     }
 
+    function onFieldScope(event, scope) {
+      //console.log('onFieldScope:', scope.form.key, scope);
+      let key = scope.form._key;
+      if(key) {
+        this.fieldRegister[key].ngModel = scope.ngModel;
+      }
+    }
+
     function processForm(form) {
-      let i = form.items.length;
-      while(i) {
-        let field = form.items[i - 1];
-        this.processField(field);
-        if(field.batchConfig) {
-          let batchField = this.createBatchField(field);
-          form.items.splice(i, 0, batchField);
+      this.processItems(form, 'form');
+    }
+
+    function processItems(field, children = 'items') {
+      //console.log('processItems:', field, children);
+      let i = field[children].length - 1;
+      while(i > -1) {
+        let child = field[children][i];
+        let show = this.processField(child);
+        if(child.batchConfig) {
+          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field';
+          let batchField = this.createBatchField(child);
+          let dirtyCheck = this.createDirtyCheck(child);
+          // add mode buttons after field
+          field[children][i] = {
+            type: 'section',
+            htmlClass: 'cn-batch-wrapper',
+            items: [child, dirtyCheck, batchField]
+          };
+          this.fieldRegister[child.key] = {
+            field: child
+          };
         }
+        if(!show) {
+          // remove field if batch isn't supported by it or children
+          field[children].splice(i, 1);
+        }
+        --i;
       }
     }
 
     function processField(field) {
-      if(!field.batchConfig) {
-        processHidden(field);
-        return;
-      }
+      //console.log('processField:', field.batchConfig, field);
       if(field.key) {
-        field.schema = field.schema || cnFlexFormService.getSchema(field);
+        if(!field.batchConfig) return false;
+
+        field._key = field.key;
+        field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
+        field.type = field.type || field.schema.type;
+        //field.required = false;
 
         let fieldType = cnFlexFormTypes.getFieldType(field);
         let handler = fieldTypeHandlers[fieldType];
@@ -83,29 +157,104 @@
 
           handler.bind(this)(field);
         }
-        else {
-          this.processHidden(field);
-          return;
-        }
+        else return false;
       }
       else if(field.items) {
-        this.processForm(field);
+        this.processItems(field);
+        if(!field.items.length) return false;
       }
+      return true;
     }
 
     function createBatchField(field) {
-      return {
+      let batchField = {
         type: 'radiobuttons',
         titleMap: field.batchConfig.titleMap,
-        watch: {
-          resolution: field.batchConfig.onSelect
-        },
-        key: `$$batch$$.${field.key}`,
-        schema: {
-          type: 'string',
-          title: 'Edit Mode'
-        }
+        key: `__batchConfig.${field.key}`
       };
+
+      if(batchField.titleMap.length === 1) {
+        batchField.condition = 'false';
+      }
+
+      this.addToSchema(field.key, '__batchConfig', {
+        type: 'string',
+        title: 'Edit Mode',
+        default: field.batchConfig.default
+      });
+
+      if(field.batchConfig.onSelect) {
+        batchField.watch = {
+          resolution: (val, prev) => {
+            field.batchConfig.onSelect[val](prev);
+          }
+        };
+      }
+
+      return batchField;
+    }
+
+    function createDirtyCheck(field) {
+      let dirtyCheck = {
+        type: 'cn-dirty-check',
+        htmlClass: (field.notitle || !field.schema.title) ? 'notitle' : '',
+        key: `__dirtyCheck.${field.key}`
+      };
+
+      this.addToSchema(field.key, '__dirtyCheck', {
+        type: 'boolean',
+        notitle: true
+      });
+
+      if(field.watch) {
+        if(!_.isArray(field.watch)) field.watch = [field.watch];
+      }
+      else {
+        field.watch = [];
+      }
+
+      field.watch.push({
+        resolution: (val, prev) => {
+          if(!angular.equals(val, prev)) {
+            let register = this.fieldRegister[field.key];
+            if(register && register.ngModel.$dirty) {
+              cnFlexFormService.parseExpression(dirtyCheck.key, this.model).set(true);
+            }
+          }
+        }
+      });
+
+      return dirtyCheck;
+    }
+
+    function addToSchema(key, start, schema) {
+      let path = sfPath.parse(key);
+      let depth = this.schema.schema.properties[start];
+
+      path.forEach((k, i) => {
+        if(i === path.length - 1) {
+          depth.properties[k] = schema;
+        }
+        else if(k === '') {
+          if(!depth.items) {
+            depth.items = {
+              type: 'object'
+            };
+          }
+          depth = depth.items;
+        }
+        else {
+          if(!depth.properties) {
+            depth.properties = {};
+          }
+          if(!depth.properties[k]) {
+            depth.properties[k] = {
+              type: 'object'
+            };
+          }
+          depth = depth.properties[k];
+        }
+      });
     }
 
     function getModelValues(field) {
@@ -114,12 +263,69 @@
       });
     }
 
-    function processHidden(field) {
-      field.condition = 'false';
+    function getChangedModels() {
+      let models = [];
+
+      _.each(this.fieldRegister, (register, key) => {
+        let dirty = cnFlexFormService
+            .parseExpression(`__dirtyCheck.${key}`, this.model)
+            .get();
+
+        console.log('key, dirty:', key, dirty, register);
+        if(!dirty) return;
+
+        let mode = cnFlexFormService
+            .parseExpression(`__batchConfig.${key}`, this.model)
+            .get();
+
+        this.models.forEach((model, i) => {
+          if(!models[i]) models[i] = {};
+
+          let val = cnFlexFormService
+              .parseExpression(key, this.model)
+              .get();
+          let update = cnFlexFormService
+              .parseExpression(key, models[i]);
+          let original = cnFlexFormService
+              .parseExpression(key, this.models[i]);
+
+          this.setValue(val, update, original, mode);
+        });
+      });
+
+      return models;
+    }
+
+    function setValue(val, update, original, mode) {
+      if(mode === 'replace') {
+        update.set(val);
+      }
+      else if(mode === 'push') {
+        let originalVal = original.get();
+        if(_.isArray(originalVal)) {
+          update.set(originalVal.concat(val));
+        }
+        else if(_.isString(originalVal)) {
+          update.set(`${originalVal} ${val.trim()}`);
+        }
+      }
+      /* This needs work, _.find(val, item) might not work because the
+         the items we're comparing might have the same id but one might
+         have different properties
+      else if(mode === 'remove') {
+        original.get().forEach(item => {
+          if(!_.find(val, item)) {
+            update = _.reject(update, item);
+          }
+        });
+      }
+      */
     }
 
     function processString(field) {
-      field.batchConfig.titleMap = field.batchConfig.titleMap || [{
+      let config = field.batchConfig;
+
+      config.titleMap = config.titleMap || [{
         name: 'Replace',
         value: 'replace'
       }, {
@@ -127,30 +333,42 @@
         value: 'push'
       }];
 
-      if(_.uniq(field.batchConfig.ogValues).length === 1) {
-        field.placeholder = _.first(field.batchConfig.ogValues);
-      }
-      else {
-        field.placeholder = '—';
-      }
+      config.default = config.default || 'push';
+
+      config.onSelect = {
+        replace: () => {
+          if(_.uniq(config.ogValues).length === 1) {
+            field.placeholder = _.first(config.ogValues);
+          }
+          else {
+            field.placeholder = '—';
+          }
+        },
+        push: () => {
+          field.placeholder = '';
+        }
+      };
     }
 
     function processSelect(field) {
       let type = field.schema.type;
+      let config = field.batchConfig;
 
       if(type === 'array') {
-        field.batchConfig.titleMap = field.batchConfig.titleMap || [{
+        config.titleMap = config.titleMap || [{
           name: 'Replace',
           value: 'replace'
         }, {
           name: 'Append',
           value: 'push'
-        }, {
+        }/*, {
           name: 'Remove',
           value: 'remove'
-        }];
+        }*/];
 
-        field.batchConfig.onSelect = {
+        config.default = config.default || 'push';
+
+        config.onSelect = {
           replace: (prev) => {
             if(prev !== 'push') {
               cnFlexFormService.parseExpression(field.key, this.model).set([]);
@@ -168,15 +386,17 @@
         };
       }
       else {
-        field.batchConfig.titleMap = field.batchConfig.titleMap || [{
+        config.titleMap = config.titleMap || [{
           name: 'Replace',
           value: 'replace'
         }];
 
-        field.batchConfig.onSelect = {
+        config.default = config.default || 'replace';
+
+        config.onSelect = {
           replace: (prev) => {
-            let first = _.first(field.batchConfig.ogValues);
-            if(_.every(field.batchConfig.ogValues, first)) {
+            let first = _.first(config.ogValues);
+            if(_.every(config.ogValues, first)) {
               field.placeholder = first[field.displayProperty || 'name'];
             }
             else {
@@ -185,16 +405,76 @@
           }
         };
       }
-
-      field.batchConfig.watch = {
-        resolution: (val, prev) => {
-          field.batchConfig.onSelect[val](prev);
-        }
-      };
     }
 
     function processDate(field) {
+      console.log('field.schema:', field.schema);
+      //field.schema.type = ['null', field.schema.type];
 
+      let config = field.batchConfig;
+
+      config.titleMap = config.titleMap || [{
+            name: 'Replace',
+            value: 'replace'
+          }];
+
+      config.default = config.default || 'replace';
+
+      if(_.uniq(config.ogValues).length === 1) {
+        field.placeholder = _.first(config.ogValues);
+      }
+      else {
+        field.placeholder = '—';
+      }
+    }
+
+    function clearDefaults() {
+      this.schema.schema.required = [];
+      _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+
+      this.schema.schema.properties.__batchConfig = {
+        type: 'object',
+        properties: {}
+      };
+
+      this.schema.schema.properties.__dirtyCheck = {
+        type: 'object',
+        properties: {}
+      };
+    }
+
+    function clearSchemaDefault(schema) {
+      schema.default = undefined;
+      if(schema.type === 'object' && schema.properties) {
+        _.each(schema.properties, this.clearSchemaDefault.bind(this));
+      }
+      else if(schema.type === 'array' && schema.items) {
+        this.clearSchemaDefault(schema.items);
+      }
+    }
+
+    function showResults(results, config) {
+      console.log('showResults:', $state.current.name);
+      this.results = results;
+      this.resultsConfig = config;
+
+      $state.go('.modal', {
+        modal: 'results',
+        modalId: 0
+      });
+
+      this.onCloseModal = $rootScope.$on('$stateChangeStart', this.closeModal.bind(this));
+    }
+
+    function closeModal(e, toState, toParams) {
+      console.log('closeModal:', e, toState, toParams);
+      console.log('this.resultsConfig:', this.resultsConfig);
+      this.onCloseModal();
+      let config = this.resultsConfig;
+      if(config && config.returnState) {
+        //timeout needed so current state
+        $timeout(() => $state.go(config.returnState.name, config.returnState.params));
+      }
     }
   }
 

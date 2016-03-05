@@ -1,15 +1,111 @@
 'use strict';
 
 (function () {
-  angular.module('cn.batch-forms', ['cn-flex-form', 'cn.util']);
+  angular.module('cn.batch-forms', ['schemaForm', 'cn.flex-form', 'cn.util', 'ui.router']);
+})();
+'use strict';
+
+(function () {
+  'use strict';
+
+  angular.module('cn.batch-forms').controller('BatchResults', BatchResults);
+
+  BatchResults.$inject = ['$state', 'parent', '$timeout'];
+
+  function BatchResults($state, parent, $timeout) {
+
+    var vm = this;
+    vm.parent = parent;
+    vm.results = vm.parent.results;
+    vm.originals = vm.parent.models;
+    vm.config = vm.parent.resultsConfig;
+    vm.displayName = vm.config && vm.config.displayName || 'name';
+
+    vm.activate = activate;
+    vm.cancel = cancel;
+    vm.done = cancel;
+
+    vm.activate();
+
+    //////////
+
+    function activate() {
+      console.log('vm.parent:', vm.parent);
+
+      if (!vm.results) {
+        // the modal doesn't go away without the timeout
+        $timeout(vm.cancel);
+      }
+
+      vm.headerConfig = {
+        title: {
+          main: 'Batch Results'
+        },
+        actionConfig: {
+          actions: [{
+            text: 'Cool'
+          }]
+        },
+        noData: true
+      };
+    }
+
+    function cancel() {
+      $state.go('^');
+    }
+  }
+})();
+'use strict';
+
+(function () {
+  'use strict';
+
+  angular.module('cn.batch-forms').config(cnBatchFormsConfig).run(addTemplates);
+
+  var TYPE = 'cn-dirty-check';
+  var TEMPLATE_URL = 'cn-batch-forms/cn-dirty-check.html';
+
+  cnBatchFormsConfig.$inject = ['cnFlexFormServiceProvider', 'cnFlexFormModalLoaderServiceProvider'];
+
+  function cnBatchFormsConfig(cnFlexFormServiceProvider, cnFlexFormModalLoaderServiceProvider) {
+
+    cnFlexFormServiceProvider.registerField({
+      condition: function condition(field) {
+        return field.type === TYPE;
+      },
+      handler: function handler(field) {},
+
+      type: TYPE,
+      templateUrl: TEMPLATE_URL
+    });
+
+    cnFlexFormModalLoaderServiceProvider.addMapping('results', {
+      controller: 'BatchResults',
+      controllerAs: 'vm',
+      templateUrl: 'cn-batch-forms/batch-results.html'
+    });
+  }
+
+  addTemplates.$inject = ['$templateCache'];
+  function addTemplates($templateCache) {
+    $templateCache.put(TEMPLATE_URL, '\
+        <div class="checkbox cn-dirty-check {{form.htmlClass}}">\
+          <input type="checkbox"\
+                 ng-model="$$value$$"\
+                 ng-model-options="form.ngModelOptions"\
+                 sf-changed="form"\
+                 name="{{form.key.slice(-1)[0]}}"/>\
+        </div>');
+  }
 })();
 'use strict';
 
 (function () {
   angular.module('cn.batch-forms').factory('cnBatchForms', cnBatchForms);
 
-  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes'];
-  function cnBatchForms(cnFlexFormService, cnFlexFormTypes) {
+  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$state', '$timeout', 'cnFlexFormModalLoaderService'];
+  function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $state, $timeout, cnFlexFormModalLoaderService) {
+
     var fieldTypeHandlers = {
       'string': processString,
       'cn-autocomplete': processSelect,
@@ -27,56 +123,116 @@
 
       var service = BatchForms(schema, model, models);
 
-      return service.schema;
+      return service;
     }
 
-    function BatchForms() {
+    function BatchForms(schema, model, models) {
       return Object.create({
         constructor: constructor,
+        addToSchema: addToSchema,
+        clearDefaults: clearDefaults,
+        clearSchemaDefault: clearSchemaDefault,
+        closeModal: closeModal,
+        createDirtyCheck: createDirtyCheck,
         createBatchField: createBatchField,
+        onFieldScope: onFieldScope,
         processForm: processForm,
         processField: processField,
+        processItems: processItems,
         processDate: processDate,
-        processHidden: processHidden,
         processString: processString,
         processSelect: processSelect,
-        getModelValues: getModelValues
-      }).constructor();
+        getModelValues: getModelValues,
+        getChangedModels: getChangedModels,
+        setValue: setValue,
+        showResults: showResults
+      }).constructor(schema, model, models);
     }
 
     function constructor(schema, model, models) {
+      console.log('BatchForms:', schema, model, models);
+
+      cnFlexFormModalLoaderService.resolveMapping('results', 0, this);
+
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.fieldRegister = {};
+
+      this.clearDefaults();
 
       if (schema.forms) {
-        schema.forms.forEach(this.processForm);
+        var i = schema.forms.length - 1;
+        while (i > -1) {
+          this.processForm(schema.forms[i]);
+          if (!schema.forms[i].form.length) {
+            schema.forms.splice(i, 1);
+          }
+          --i;
+        }
+        //schema.forms.forEach(this.processForm.bind(this));
       } else {
-        this.processForm(schema.form);
-      }
+          this.processForm(schema.form);
+        }
+
+      $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
+
+      console.log('BatchDone:', schema, model, models);
 
       return this;
     }
 
+    function onFieldScope(event, scope) {
+      //console.log('onFieldScope:', scope.form.key, scope);
+      var key = scope.form._key;
+      if (key) {
+        this.fieldRegister[key].ngModel = scope.ngModel;
+      }
+    }
+
     function processForm(form) {
-      var i = form.items.length;
-      while (i) {
-        var field = form.items[i - 1];
-        this.processField(field);
-        if (field.batchConfig) {
-          var batchField = this.createBatchField(field);
-          form.items.splice(i, 0, batchField);
+      this.processItems(form, 'form');
+    }
+
+    function processItems(field) {
+      var children = arguments.length <= 1 || arguments[1] === undefined ? 'items' : arguments[1];
+
+      //console.log('processItems:', field, children);
+      var i = field[children].length - 1;
+      while (i > -1) {
+        var child = field[children][i];
+        var show = this.processField(child);
+        if (child.batchConfig) {
+          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field';
+          var batchField = this.createBatchField(child);
+          var dirtyCheck = this.createDirtyCheck(child);
+          // add mode buttons after field
+          field[children][i] = {
+            type: 'section',
+            htmlClass: 'cn-batch-wrapper',
+            items: [child, dirtyCheck, batchField]
+          };
+          this.fieldRegister[child.key] = {
+            field: child
+          };
         }
+        if (!show) {
+          // remove field if batch isn't supported by it or children
+          field[children].splice(i, 1);
+        }
+        --i;
       }
     }
 
     function processField(field) {
-      if (!field.batchConfig) {
-        processHidden(field);
-        return;
-      }
+      //console.log('processField:', field.batchConfig, field);
       if (field.key) {
-        field.schema = field.schema || cnFlexFormService.getSchema(field);
+        if (!field.batchConfig) return false;
+
+        field._key = field.key;
+        field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
+        field.type = field.type || field.schema.type;
+        //field.required = false;
 
         var fieldType = cnFlexFormTypes.getFieldType(field);
         var handler = fieldTypeHandlers[fieldType];
@@ -86,28 +242,102 @@
           field.batchConfig.ogValues = this.getModelValues(field);
 
           handler.bind(this)(field);
-        } else {
-          this.processHidden(field);
-          return;
-        }
+        } else return false;
       } else if (field.items) {
-        this.processForm(field);
+        this.processItems(field);
+        if (!field.items.length) return false;
       }
+      return true;
     }
 
     function createBatchField(field) {
-      return {
+      var batchField = {
         type: 'radiobuttons',
         titleMap: field.batchConfig.titleMap,
-        watch: {
-          resolution: field.batchConfig.onSelect
-        },
-        key: '$$batch$$.' + field.key,
-        schema: {
-          type: 'string',
-          title: 'Edit Mode'
-        }
+        key: '__batchConfig.' + field.key
       };
+
+      if (batchField.titleMap.length === 1) {
+        batchField.condition = 'false';
+      }
+
+      this.addToSchema(field.key, '__batchConfig', {
+        type: 'string',
+        title: 'Edit Mode',
+        default: field.batchConfig.default
+      });
+
+      if (field.batchConfig.onSelect) {
+        batchField.watch = {
+          resolution: function resolution(val, prev) {
+            field.batchConfig.onSelect[val](prev);
+          }
+        };
+      }
+
+      return batchField;
+    }
+
+    function createDirtyCheck(field) {
+      var _this = this;
+
+      var dirtyCheck = {
+        type: 'cn-dirty-check',
+        htmlClass: field.notitle || !field.schema.title ? 'notitle' : '',
+        key: '__dirtyCheck.' + field.key
+      };
+
+      this.addToSchema(field.key, '__dirtyCheck', {
+        type: 'boolean',
+        notitle: true
+      });
+
+      if (field.watch) {
+        if (!_.isArray(field.watch)) field.watch = [field.watch];
+      } else {
+        field.watch = [];
+      }
+
+      field.watch.push({
+        resolution: function resolution(val, prev) {
+          if (!angular.equals(val, prev)) {
+            var register = _this.fieldRegister[field.key];
+            if (register && register.ngModel.$dirty) {
+              cnFlexFormService.parseExpression(dirtyCheck.key, _this.model).set(true);
+            }
+          }
+        }
+      });
+
+      return dirtyCheck;
+    }
+
+    function addToSchema(key, start, schema) {
+      var path = sfPath.parse(key);
+      var depth = this.schema.schema.properties[start];
+
+      path.forEach(function (k, i) {
+        if (i === path.length - 1) {
+          depth.properties[k] = schema;
+        } else if (k === '') {
+          if (!depth.items) {
+            depth.items = {
+              type: 'object'
+            };
+          }
+          depth = depth.items;
+        } else {
+          if (!depth.properties) {
+            depth.properties = {};
+          }
+          if (!depth.properties[k]) {
+            depth.properties[k] = {
+              type: 'object'
+            };
+          }
+          depth = depth.properties[k];
+        }
+      });
     }
 
     function getModelValues(field) {
@@ -116,12 +346,61 @@
       });
     }
 
-    function processHidden(field) {
-      field.condition = 'false';
+    function getChangedModels() {
+      var _this2 = this;
+
+      var models = [];
+
+      _.each(this.fieldRegister, function (register, key) {
+        var dirty = cnFlexFormService.parseExpression('__dirtyCheck.' + key, _this2.model).get();
+
+        console.log('key, dirty:', key, dirty, register);
+        if (!dirty) return;
+
+        var mode = cnFlexFormService.parseExpression('__batchConfig.' + key, _this2.model).get();
+
+        _this2.models.forEach(function (model, i) {
+          if (!models[i]) models[i] = {};
+
+          var val = cnFlexFormService.parseExpression(key, _this2.model).get();
+          var update = cnFlexFormService.parseExpression(key, models[i]);
+          var original = cnFlexFormService.parseExpression(key, _this2.models[i]);
+
+          _this2.setValue(val, update, original, mode);
+        });
+      });
+
+      return models;
+    }
+
+    function setValue(val, update, original, mode) {
+      if (mode === 'replace') {
+        update.set(val);
+      } else if (mode === 'push') {
+        var originalVal = original.get();
+        if (_.isArray(originalVal)) {
+          update.set(originalVal.concat(val));
+        } else if (_.isString(originalVal)) {
+          update.set(originalVal + ' ' + val.trim());
+        }
+      }
+      /* This needs work, _.find(val, item) might not work because the
+         the items we're comparing might have the same id but one might
+         have different properties
+      else if(mode === 'remove') {
+        original.get().forEach(item => {
+          if(!_.find(val, item)) {
+            update = _.reject(update, item);
+          }
+        });
+      }
+      */
     }
 
     function processString(field) {
-      field.batchConfig.titleMap = field.batchConfig.titleMap || [{
+      var config = field.batchConfig;
+
+      config.titleMap = config.titleMap || [{
         name: 'Replace',
         value: 'replace'
       }, {
@@ -129,56 +408,70 @@
         value: 'push'
       }];
 
-      if (_.uniq(field.batchConfig.ogValues).length === 1) {
-        field.placeholder = _.first(field.batchConfig.ogValues);
-      } else {
-        field.placeholder = '—';
-      }
+      config.default = config.default || 'push';
+
+      config.onSelect = {
+        replace: function replace() {
+          if (_.uniq(config.ogValues).length === 1) {
+            field.placeholder = _.first(config.ogValues);
+          } else {
+            field.placeholder = '—';
+          }
+        },
+        push: function push() {
+          field.placeholder = '';
+        }
+      };
     }
 
     function processSelect(field) {
-      var _this = this;
+      var _this3 = this;
 
       var type = field.schema.type;
+      var config = field.batchConfig;
 
       if (type === 'array') {
-        field.batchConfig.titleMap = field.batchConfig.titleMap || [{
+        config.titleMap = config.titleMap || [{
           name: 'Replace',
           value: 'replace'
         }, {
           name: 'Append',
           value: 'push'
-        }, {
-          name: 'Remove',
-          value: 'remove'
-        }];
+        } /*, {
+           name: 'Remove',
+           value: 'remove'
+          }*/];
 
-        field.batchConfig.onSelect = {
+        config.default = config.default || 'push';
+
+        config.onSelect = {
           replace: function replace(prev) {
             if (prev !== 'push') {
-              cnFlexFormService.parseExpression(field.key, _this.model).set([]);
+              cnFlexFormService.parseExpression(field.key, _this3.model).set([]);
             }
           },
           push: function push(prev) {
             if (prev !== 'replace') {
-              cnFlexFormService.parseExpression(field.key, _this.model).set([]);
+              cnFlexFormService.parseExpression(field.key, _this3.model).set([]);
             }
           },
           remove: function remove() {
             var val = _.chain(field.batchConfig.ogValues).flatten().uniq().value();
-            cnFlexFormService.parseExpression(field.key, _this.model).set(val);
+            cnFlexFormService.parseExpression(field.key, _this3.model).set(val);
           }
         };
       } else {
-        field.batchConfig.titleMap = field.batchConfig.titleMap || [{
+        config.titleMap = config.titleMap || [{
           name: 'Replace',
           value: 'replace'
         }];
 
-        field.batchConfig.onSelect = {
+        config.default = config.default || 'replace';
+
+        config.onSelect = {
           replace: function replace(prev) {
-            var first = _.first(field.batchConfig.ogValues);
-            if (_.every(field.batchConfig.ogValues, first)) {
+            var first = _.first(config.ogValues);
+            if (_.every(config.ogValues, first)) {
               field.placeholder = first[field.displayProperty || 'name'];
             } else {
               field.placeholder = '—';
@@ -186,14 +479,81 @@
           }
         };
       }
+    }
 
-      field.batchConfig.watch = {
-        resolution: function resolution(val, prev) {
-          field.batchConfig.onSelect[val](prev);
-        }
+    function processDate(field) {
+      console.log('field.schema:', field.schema);
+      //field.schema.type = ['null', field.schema.type];
+
+      var config = field.batchConfig;
+
+      config.titleMap = config.titleMap || [{
+        name: 'Replace',
+        value: 'replace'
+      }];
+
+      config.default = config.default || 'replace';
+
+      if (_.uniq(config.ogValues).length === 1) {
+        field.placeholder = _.first(config.ogValues);
+      } else {
+        field.placeholder = '—';
+      }
+    }
+
+    function clearDefaults() {
+      this.schema.schema.required = [];
+      _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+
+      this.schema.schema.properties.__batchConfig = {
+        type: 'object',
+        properties: {}
+      };
+
+      this.schema.schema.properties.__dirtyCheck = {
+        type: 'object',
+        properties: {}
       };
     }
 
-    function processDate(field) {}
+    function clearSchemaDefault(schema) {
+      schema.default = undefined;
+      if (schema.type === 'object' && schema.properties) {
+        _.each(schema.properties, this.clearSchemaDefault.bind(this));
+      } else if (schema.type === 'array' && schema.items) {
+        this.clearSchemaDefault(schema.items);
+      }
+    }
+
+    function showResults(results, config) {
+      console.log('showResults:', $state.current.name);
+      this.results = results;
+      this.resultsConfig = config;
+
+      $state.go('.modal', {
+        modal: 'results',
+        modalId: 0
+      });
+
+      this.onCloseModal = $rootScope.$on('$stateChangeStart', this.closeModal.bind(this));
+    }
+
+    function closeModal(e, toState, toParams) {
+      console.log('closeModal:', e, toState, toParams);
+      console.log('this.resultsConfig:', this.resultsConfig);
+      this.onCloseModal();
+      var config = this.resultsConfig;
+      if (config && config.returnState) {
+        //timeout needed so current state
+        $timeout(function () {
+          return $state.go(config.returnState.name, config.returnState.params);
+        });
+      }
+    }
   }
 })();
+"use strict";
+
+angular.module("cn.batch-forms").run(["$templateCache", function ($templateCache) {
+  $templateCache.put("cn-batch-forms/batch-results.html", "<div class=\"cn-modal\">\n  <div class=\"modal-header cn-heading row vertical-parent\">\n    <cn-flex-form-header\n      ff-header-config=\"vm.headerConfig\"\n      ff-submit=\"vm.done()\">\n    </cn-flex-form-header>\n  </div>\n  <div class=\"modal-body cn-list\"\n       cn-responsive-height=\"80\"\n       cn-responsive-break=\"sm\"\n       cn-set-max-height>\n    <ul class=\"list-group gutterless\">\n      <li ng-repeat=\"result in vm.results\"\n          class=\"list-group-item\"\n          ng-class=\"{\n            \'text-danger\': result.status != 200,\n            \'text-primary\': result.status == 200\n          }\">\n        <div class=\"row\">\n          <div class=\"col-sm-1 text-center\">\n            <i class=\"fa fa-{{result.status == 200 ? \'check\' : \'times\'}}\"></i>\n          </div>\n          <div class=\"col-sm-11\"\n               ng-show=\"result.status == 200\">\n            {{result.body[vm.displayName]}} ({{result.body.id}}):\n            updated successfully\n          </div>\n          <div class=\"col-sm-11\"\n               ng-show=\"result.status != 200\">\n            {{vm.originals[$index][vm.displayName]}} ({{vm.originals[$index].id}}):\n            {{result.body.message}}\n          </div>\n        </div>\n      </li>\n    </ul>\n  </div>\n</div>\n");
+}]);
