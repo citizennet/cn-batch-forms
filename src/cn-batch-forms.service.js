@@ -408,7 +408,7 @@
     }
 
     function processDate(field) {
-      console.log('field.schema:', field.schema);
+      console.log('processDate:field:', field);
       //field.schema.type = ['null', field.schema.type];
 
       let config = field.batchConfig;
