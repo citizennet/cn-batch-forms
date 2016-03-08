@@ -24,7 +24,8 @@
     var fieldTypeHandlers = {
       'string': processString,
       'cn-autocomplete': processSelect,
-      'cn-datetimepicker': processDate
+      'cn-datetimepicker': processDate,
+      'cn-toggle': processToggle
     };
 
     return {
@@ -44,6 +45,7 @@
     function BatchForms(schema, model, models) {
       return Object.create({
         constructor,
+        addMeta,
         addToSchema,
         clearDefaults,
         clearSchemaDefault,
@@ -57,6 +59,7 @@
         processDate,
         processString,
         processSelect,
+        processToggle,
         getModelValues,
         getChangedModels,
         setValue,
@@ -90,6 +93,8 @@
       else {
         this.processForm(schema.form);
       }
+
+      this.addMeta();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
 
@@ -170,7 +175,8 @@
       let batchField = {
         type: 'radiobuttons',
         titleMap: field.batchConfig.titleMap,
-        key: `__batchConfig.${field.key}`
+        key: `__batchConfig.${field.key}`,
+        htmlClass: 'cn-batch-options'
       };
 
       if(batchField.titleMap.length === 1) {
@@ -309,6 +315,16 @@
           update.set(`${originalVal} ${val.trim()}`);
         }
       }
+      else if(mode === 'prepend') {
+        let originalVal = original.get();
+        if(_.isArray(originalVal)) {
+          update.set(val.concat(originalVal));
+        }
+        else if(_.isString(originalVal)) {
+          update.set(`${val.trim()} ${originalVal}`);
+        }
+        console.log('prepend:', update.get());
+      }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
          have different properties
@@ -326,14 +342,17 @@
       let config = field.batchConfig;
 
       config.titleMap = config.titleMap || [{
-        name: 'Replace',
-        value: 'replace'
-      }, {
-        name: 'Append',
-        value: 'push'
-      }];
+            name: 'Replace',
+            value: 'replace'
+          }, {
+            name: 'Prepend',
+            value: 'prepend'
+          }, {
+            name: 'Append',
+            value: 'append'
+          }];
 
-      config.default = config.default || 'push';
+      config.default = config.default || 'append';
 
       config.onSelect = {
         replace: () => {
@@ -344,7 +363,10 @@
             field.placeholder = '—';
           }
         },
-        push: () => {
+        append: () => {
+          field.placeholder = '';
+        },
+        prepend: () => {
           field.placeholder = '';
         }
       };
@@ -360,21 +382,21 @@
           value: 'replace'
         }, {
           name: 'Append',
-          value: 'push'
+          value: 'append'
         }/*, {
           name: 'Remove',
           value: 'remove'
         }*/];
 
-        config.default = config.default || 'push';
+        config.default = config.default || 'append';
 
         config.onSelect = {
           replace: (prev) => {
-            if(prev !== 'push') {
+            if(prev !== 'append') {
               cnFlexFormService.parseExpression(field.key, this.model).set([]);
             }
           },
-          push: (prev) => {
+          append: (prev) => {
             if(prev !== 'replace') {
               cnFlexFormService.parseExpression(field.key, this.model).set([]);
             }
@@ -393,24 +415,30 @@
 
         config.default = config.default || 'replace';
 
-        config.onSelect = {
-          replace: (prev) => {
-            let first = _.first(config.ogValues);
-            if(_.every(config.ogValues, first)) {
-              field.placeholder = first[field.displayProperty || 'name'];
-            }
-            else {
-              field.placeholder = '—';
-            }
+        //if(field.titleMap && !_.chain(field.titleMap).first().isObject().value()) {
+        //  field.placeholder = _.first(config.ogValues);
+        //}
+        //if(field.schema.type === 'object') {
+        let first = _.first(config.ogValues);
+        if(_.isObject(first)) {
+          if(_.every(config.ogValues, first)) {
+            field.placeholder = first[field.displayProperty || 'name'];
           }
-        };
+        }
+        else if(_.uniq(config.ogValues).length === 1) {
+          if(field.titleMap) {
+            first = _.find(field.titleMap, {[field.valueProperty || 'value']: first});
+          }
+          field.placeholder = first[field.displayProperty || 'name'];
+        }
+        //}
+        if(!field.placeholder) {
+          field.placeholder = '—';
+        }
       }
     }
 
     function processDate(field) {
-      console.log('processDate:field:', field);
-      //field.schema.type = ['null', field.schema.type];
-
       let config = field.batchConfig;
 
       config.titleMap = config.titleMap || [{
@@ -421,10 +449,25 @@
       config.default = config.default || 'replace';
 
       if(_.uniq(config.ogValues).length === 1) {
-        field.placeholder = _.first(config.ogValues);
+        field.placeholder = moment(_.first(config.ogValues)).format('M/DD/YYYY h:mm a');
       }
       else {
         field.placeholder = '—';
+      }
+    }
+
+    function processToggle(field) {
+      let config = field.batchConfig;
+
+      config.titleMap = config.titleMap || [{
+            name: 'Replace',
+            value: 'replace'
+          }];
+
+      config.default = config.default || 'replace';
+
+      if(_.uniq(config.ogValues).length === 1) {
+
       }
     }
 
@@ -470,11 +513,40 @@
       console.log('closeModal:', e, toState, toParams);
       console.log('this.resultsConfig:', this.resultsConfig);
       this.onCloseModal();
+
       let config = this.resultsConfig;
       if(config && config.returnState) {
         //timeout needed so current state
         $timeout(() => $state.go(config.returnState.name, config.returnState.params));
       }
+
+      this.results = [];
+      this.resultsConfig = null;
+    }
+
+    function addMeta() {
+      this.schema.meta = `
+          <div class="well">
+            <h5>Edit Modes</h5>
+            <p>Some types of fields allow you to apply batch changes in
+            different ways:</p>
+            <dl>
+              <dt>Replace:</dt>
+              <dd>Replace all the original values
+              with the new value. <em>(If you don't see an <b>Edit Mode</b> option
+              for a field, this will be the default)</em></dd>
+            </dl>
+            <dl>
+              <dt>Prepend:</dt>
+              <dd>Add the new value to the start of the original
+              values for each item.</dd>
+            </dl>
+            <dl>
+              <dt>Append:</dt>
+              <dd>Affix the new value at the end of the original
+              values for each item.</dd>
+            </dl>
+          </div>`;
     }
   }
 

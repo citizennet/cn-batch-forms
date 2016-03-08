@@ -100,6 +100,8 @@
 })();
 'use strict';
 
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
 (function () {
   angular.module('cn.batch-forms').factory('cnBatchForms', cnBatchForms);
 
@@ -109,7 +111,8 @@
     var fieldTypeHandlers = {
       'string': processString,
       'cn-autocomplete': processSelect,
-      'cn-datetimepicker': processDate
+      'cn-datetimepicker': processDate,
+      'cn-toggle': processToggle
     };
 
     return {
@@ -129,6 +132,7 @@
     function BatchForms(schema, model, models) {
       return Object.create({
         constructor: constructor,
+        addMeta: addMeta,
         addToSchema: addToSchema,
         clearDefaults: clearDefaults,
         clearSchemaDefault: clearSchemaDefault,
@@ -142,6 +146,7 @@
         processDate: processDate,
         processString: processString,
         processSelect: processSelect,
+        processToggle: processToggle,
         getModelValues: getModelValues,
         getChangedModels: getChangedModels,
         setValue: setValue,
@@ -174,6 +179,8 @@
       } else {
           this.processForm(schema.form);
         }
+
+      this.addMeta();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
 
@@ -254,7 +261,8 @@
       var batchField = {
         type: 'radiobuttons',
         titleMap: field.batchConfig.titleMap,
-        key: '__batchConfig.' + field.key
+        key: '__batchConfig.' + field.key,
+        htmlClass: 'cn-batch-options'
       };
 
       if (batchField.titleMap.length === 1) {
@@ -383,6 +391,14 @@
         } else if (_.isString(originalVal)) {
           update.set(originalVal + ' ' + val.trim());
         }
+      } else if (mode === 'prepend') {
+        var originalVal = original.get();
+        if (_.isArray(originalVal)) {
+          update.set(val.concat(originalVal));
+        } else if (_.isString(originalVal)) {
+          update.set(val.trim() + ' ' + originalVal);
+        }
+        console.log('prepend:', update.get());
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
@@ -404,11 +420,14 @@
         name: 'Replace',
         value: 'replace'
       }, {
+        name: 'Prepend',
+        value: 'prepend'
+      }, {
         name: 'Append',
-        value: 'push'
+        value: 'append'
       }];
 
-      config.default = config.default || 'push';
+      config.default = config.default || 'append';
 
       config.onSelect = {
         replace: function replace() {
@@ -418,7 +437,10 @@
             field.placeholder = '—';
           }
         },
-        push: function push() {
+        append: function append() {
+          field.placeholder = '';
+        },
+        prepend: function prepend() {
           field.placeholder = '';
         }
       };
@@ -436,21 +458,21 @@
           value: 'replace'
         }, {
           name: 'Append',
-          value: 'push'
+          value: 'append'
         } /*, {
            name: 'Remove',
            value: 'remove'
           }*/];
 
-        config.default = config.default || 'push';
+        config.default = config.default || 'append';
 
         config.onSelect = {
           replace: function replace(prev) {
-            if (prev !== 'push') {
+            if (prev !== 'append') {
               cnFlexFormService.parseExpression(field.key, _this3.model).set([]);
             }
           },
-          push: function push(prev) {
+          append: function append(prev) {
             if (prev !== 'replace') {
               cnFlexFormService.parseExpression(field.key, _this3.model).set([]);
             }
@@ -468,23 +490,29 @@
 
         config.default = config.default || 'replace';
 
-        config.onSelect = {
-          replace: function replace(prev) {
-            var first = _.first(config.ogValues);
-            if (_.every(config.ogValues, first)) {
-              field.placeholder = first[field.displayProperty || 'name'];
-            } else {
-              field.placeholder = '—';
-            }
+        //if(field.titleMap && !_.chain(field.titleMap).first().isObject().value()) {
+        //  field.placeholder = _.first(config.ogValues);
+        //}
+        //if(field.schema.type === 'object') {
+        var first = _.first(config.ogValues);
+        if (_.isObject(first)) {
+          if (_.every(config.ogValues, first)) {
+            field.placeholder = first[field.displayProperty || 'name'];
           }
-        };
+        } else if (_.uniq(config.ogValues).length === 1) {
+          if (field.titleMap) {
+            first = _.find(field.titleMap, _defineProperty({}, field.valueProperty || 'value', first));
+          }
+          field.placeholder = first[field.displayProperty || 'name'];
+        }
+        //}
+        if (!field.placeholder) {
+          field.placeholder = '—';
+        }
       }
     }
 
     function processDate(field) {
-      console.log('field.schema:', field.schema);
-      //field.schema.type = ['null', field.schema.type];
-
       var config = field.batchConfig;
 
       config.titleMap = config.titleMap || [{
@@ -495,10 +523,23 @@
       config.default = config.default || 'replace';
 
       if (_.uniq(config.ogValues).length === 1) {
-        field.placeholder = _.first(config.ogValues);
+        field.placeholder = moment(_.first(config.ogValues)).format('M/DD/YYYY h:mm a');
       } else {
         field.placeholder = '—';
       }
+    }
+
+    function processToggle(field) {
+      var config = field.batchConfig;
+
+      config.titleMap = config.titleMap || [{
+        name: 'Replace',
+        value: 'replace'
+      }];
+
+      config.default = config.default || 'replace';
+
+      if (_.uniq(config.ogValues).length === 1) {}
     }
 
     function clearDefaults() {
@@ -542,6 +583,7 @@
       console.log('closeModal:', e, toState, toParams);
       console.log('this.resultsConfig:', this.resultsConfig);
       this.onCloseModal();
+
       var config = this.resultsConfig;
       if (config && config.returnState) {
         //timeout needed so current state
@@ -549,6 +591,13 @@
           return $state.go(config.returnState.name, config.returnState.params);
         });
       }
+
+      this.results = [];
+      this.resultsConfig = null;
+    }
+
+    function addMeta() {
+      this.schema.meta = '\n          <div class="well">\n            <h5>Edit Modes</h5>\n            <p>Some types of fields allow you to apply batch changes in\n            different ways:</p>\n            <dl>\n              <dt>Replace:</dt>\n              <dd>Replace all the original values\n              with the new value. <em>(If you don\'t see an <b>Edit Mode</b> option\n              for a field, this will be the default)</em></dd>\n            </dl>\n            <dl>\n              <dt>Prepend:</dt>\n              <dd>Add the new value to the start of the original\n              values for each item.</dd>\n            </dl>\n            <dl>\n              <dt>Append:</dt>\n              <dd>Affix the new value at the end of the original\n              values for each item.</dd>\n            </dl>\n          </div>';
     }
   }
 })();
