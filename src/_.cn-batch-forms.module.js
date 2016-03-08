@@ -1,6 +1,8 @@
 (function() {
   angular.module('cn.batch-forms', [
-    'cn-flex-form',
-    'cn.util'
+    'schemaForm',
+    'cn.flex-form',
+    'cn.util',
+    'ui.router'
   ]);
 })();

@@ -1,0 +1,37 @@
+<div class="cn-modal">
+  <div class="modal-header cn-heading row vertical-parent">
+    <cn-flex-form-header
+      ff-header-config="vm.headerConfig"
+      ff-submit="vm.done()">
+    </cn-flex-form-header>
+  </div>
+  <div class="modal-body cn-list"
+       cn-responsive-height="80"
+       cn-responsive-break="sm"
+       cn-set-max-height>
+    <ul class="list-group gutterless">
+      <li ng-repeat="result in vm.results"
+          class="list-group-item"
+          ng-class="{
+            'text-danger': result.status != 200,
+            'text-primary': result.status == 200
+          }">
+        <div class="row">
+          <div class="col-sm-1 text-center">
+            <i class="fa fa-{{result.status == 200 ? 'check' : 'times'}}"></i>
+          </div>
+          <div class="col-sm-11"
+               ng-show="result.status == 200">
+            {{result.body[vm.displayName]}} ({{result.body.id}}):
+            updated successfully
+          </div>
+          <div class="col-sm-11"
+               ng-show="result.status != 200">
+            {{vm.originals[$index][vm.displayName]}} ({{vm.originals[$index].id}}):
+            {{result.body.message}}
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>
