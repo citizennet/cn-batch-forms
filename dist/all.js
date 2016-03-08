@@ -108,6 +108,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
   cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$state', '$timeout', 'cnFlexFormModalLoaderService'];
   function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $state, $timeout, cnFlexFormModalLoaderService) {
 
+    var instances = 0;
+
     var fieldTypeHandlers = {
       'string': processString,
       'cn-autocomplete': processSelect,
@@ -157,7 +159,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function constructor(schema, model, models) {
       console.log('BatchForms:', schema, model, models);
 
-      cnFlexFormModalLoaderService.resolveMapping('results', 0, this);
+      this.instance = instances;
+      cnFlexFormModalLoaderService.resolveMapping('results', this.instance, this);
+      instances++;
 
       this.schema = schema;
       this.model = model;
@@ -567,13 +571,13 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function showResults(results, config) {
-      console.log('showResults:', $state.current.name);
+      console.log('showResults:', results, this);
       this.results = results;
       this.resultsConfig = config;
 
       $state.go('.modal', {
         modal: 'results',
-        modalId: 0
+        modalId: this.instance
       });
 
       this.onCloseModal = $rootScope.$on('$stateChangeStart', this.closeModal.bind(this));
