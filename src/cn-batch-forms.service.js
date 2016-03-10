@@ -180,7 +180,8 @@
         type: 'radiobuttons',
         titleMap: field.batchConfig.titleMap,
         key: `__batchConfig.${field.key}`,
-        htmlClass: 'cn-batch-options'
+        htmlClass: 'cn-batch-options',
+        btnClass: 'btn-small'
       };
 
       if(batchField.titleMap.length === 1) {
@@ -310,7 +311,7 @@
       if(mode === 'replace') {
         update.set(val);
       }
-      else if(mode === 'push') {
+      else if(mode === 'append') {
         let originalVal = original.get();
         if(_.isArray(originalVal)) {
           update.set(originalVal.concat(val));
@@ -327,7 +328,6 @@
         else if(_.isString(originalVal)) {
           update.set(`${val.trim()} ${originalVal}`);
         }
-        console.log('prepend:', update.get());
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
