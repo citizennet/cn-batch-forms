@@ -73,8 +73,7 @@
       condition: function condition(field) {
         return field.type === TYPE;
       },
-      handler: function handler(field) {},
-
+      handler: function handler(field) {/*console.log('field.readonly:', field.key, field.readonly)*/},
       type: TYPE,
       templateUrl: TEMPLATE_URL
     });
@@ -94,6 +93,7 @@
                  ng-model="$$value$$"\
                  ng-model-options="form.ngModelOptions"\
                  sf-changed="form"\
+                 ng-disabled="form.readonly"\
                  name="{{form.key.slice(-1)[0]}}"/>\
         </div>');
   }
@@ -111,8 +111,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     var instances = 0;
 
     var fieldTypeHandlers = {
-      'string': processString,
+      'string': processDefault,
+      'number': processNumber,
       'cn-autocomplete': processSelect,
+      'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
       'cn-toggle': processToggle
     };
@@ -141,16 +143,20 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         closeModal: closeModal,
         createDirtyCheck: createDirtyCheck,
         createBatchField: createBatchField,
+        getChangedModels: getChangedModels,
+        getEditModeLegends: getEditModeLegends,
+        getModelValues: getModelValues,
+        getSchemaDefault: getSchemaDefault,
+        getTitleMap: getTitleMap,
         onFieldScope: onFieldScope,
         processForm: processForm,
         processField: processField,
         processItems: processItems,
         processDate: processDate,
-        processString: processString,
+        processDefault: processDefault,
+        processNumber: processNumber,
         processSelect: processSelect,
         processToggle: processToggle,
-        getModelValues: getModelValues,
-        getChangedModels: getChangedModels,
         setValue: setValue,
         showResults: showResults
       }).constructor(schema, model, models);
@@ -166,6 +172,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.editModes = {};
       this.fieldRegister = {};
 
       this.clearDefaults();
@@ -194,11 +201,15 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function onFieldScope(event, scope) {
-      //console.log('onFieldScope:', scope.form.key, scope);
       var key = scope.form._key;
+      //console.log('onFieldScope:', key, scope.form.key, scope);
       if (key) {
         this.fieldRegister[key].ngModel = scope.ngModel;
       }
+      // prevent edit mode radiobuttons from setting form to dirty
+      else if (scope.form.key[0] === '__batchConfig') {
+          scope.ngModel.$pristine = false;
+        }
     }
 
     function processForm(form) {
@@ -213,7 +224,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       while (i > -1) {
         var child = field[children][i];
         var show = this.processField(child);
-        if (child.batchConfig) {
+        if (child.batchConfig && show) {
+          //console.log('child:', child);
           child.htmlClass = (child.htmlClass || '') + ' cn-batch-field';
           var batchField = this.createBatchField(child);
           var dirtyCheck = this.createDirtyCheck(child);
@@ -221,8 +233,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           field[children][i] = {
             type: 'section',
             htmlClass: 'cn-batch-wrapper',
-            items: [child, dirtyCheck, batchField]
+            items: [child, dirtyCheck, batchField],
+            condition: child.condition
           };
+          delete child.condition;
           this.fieldRegister[child.key] = {
             field: child
           };
@@ -261,28 +275,49 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       return true;
     }
 
+    function getTitleMap(editModes) {
+      var _this = this;
+
+      editModes = editModes || ['replace'];
+
+      return editModes.map(function (value) {
+        _this.editModes[value] = true;
+        return {
+          name: _.capitalize(value),
+          value: value
+        };
+      });
+    }
+
+    function getSchemaDefault(def) {
+      return def || 'replace';
+    }
+
     function createBatchField(field) {
+      var key = '__batchConfig["' + field.key + '"]';
+
       var batchField = {
+        key: key,
         type: 'radiobuttons',
-        titleMap: field.batchConfig.titleMap,
-        key: '__batchConfig.' + field.key,
+        titleMap: this.getTitleMap(field.batchConfig.editModes),
         htmlClass: 'cn-batch-options',
-        btnClass: 'btn-small'
+        btnClass: 'btn-sm cn-no-dirty-check'
       };
 
       if (batchField.titleMap.length === 1) {
         batchField.condition = 'false';
       }
 
-      this.addToSchema(field.key, '__batchConfig', {
+      this.addToSchema(key, {
         type: 'string',
         title: 'Edit Mode',
-        default: field.batchConfig.default
+        default: this.getSchemaDefault(field.batchConfig.default)
       });
 
       if (field.batchConfig.onSelect) {
         batchField.watch = {
           resolution: function resolution(val, prev) {
+            console.log('field.batchConfig.onSelect, val, prev:', field.batchConfig.onSelect, val, prev);
             field.batchConfig.onSelect[val](prev);
           }
         };
@@ -292,45 +327,70 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function createDirtyCheck(field) {
-      var _this = this;
+      var _this2 = this;
+
+      var path = sfPath.parse(field.key);
+      var key = '__dirtyCheck["' + path[0] + '"]';
+      var child = path.length > 1;
+      var htmlClass = '';
+
+      //if(child) htmlClass += ' semi-transparent';
+      if (field.notitle || !field.schema.title) htmlClass += ' notitle';
 
       var dirtyCheck = {
-        type: 'cn-dirty-check',
-        htmlClass: field.notitle || !field.schema.title ? 'notitle' : '',
-        key: '__dirtyCheck.' + field.key
+        key: key,
+        htmlClass: htmlClass,
+        type: 'cn-dirty-check'
       };
 
-      this.addToSchema(field.key, '__dirtyCheck', {
+      this.addToSchema(key, {
         type: 'boolean',
         notitle: true
       });
 
-      if (field.watch) {
-        if (!_.isArray(field.watch)) field.watch = [field.watch];
-      } else {
-        field.watch = [];
-      }
+      console.log('dirtyCheck:', field.key, dirtyCheck.readonly);
 
-      field.watch.push({
-        resolution: function resolution(val, prev) {
-          if (!angular.equals(val, prev)) {
-            var register = _this.fieldRegister[field.key];
-            if (register && register.ngModel.$dirty) {
-              cnFlexFormService.parseExpression(dirtyCheck.key, _this.model).set(true);
+      if (!child) {
+        if (field.watch) {
+          if (!_.isArray(field.watch)) field.watch = [field.watch];
+        } else {
+          field.watch = [];
+        }
+
+        field.watch.push({
+          resolution: function resolution(val, prev) {
+            if (!angular.equals(val, prev)) {
+              var register = _this2.fieldRegister[field.key];
+              if (register) {
+                if (register.ngModel && register.ngModel.$dirty || register.initiated) {
+                  console.log('dirtyCheck.key:', dirtyCheck.key);
+                  cnFlexFormService.parseExpression(dirtyCheck.key, _this2.model).set(true);
+                } else {
+                  console.log('initiated:', register);
+                  register.initiated = true;
+                }
+              }
+              // debug
+              else {
+                  console.log('noregister:', register);
+                }
             }
           }
-        }
-      });
+        });
+      }
 
       return dirtyCheck;
     }
 
-    function addToSchema(key, start, schema) {
+    function addToSchema(key, schema) {
       var path = sfPath.parse(key);
-      var depth = this.schema.schema.properties[start];
+      var depth = this.schema.schema;
 
       path.forEach(function (k, i) {
         if (i === path.length - 1) {
+          if (!depth.properties) {
+            depth.properties = {};
+          }
           depth.properties[k] = schema;
         } else if (k === '') {
           if (!depth.items) {
@@ -360,26 +420,26 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function getChangedModels() {
-      var _this2 = this;
+      var _this3 = this;
 
       var models = [];
 
       _.each(this.fieldRegister, function (register, key) {
-        var dirty = cnFlexFormService.parseExpression('__dirtyCheck.' + key, _this2.model).get();
+        var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this3.model).get();
 
         console.log('key, dirty:', key, dirty, register);
         if (!dirty) return;
 
-        var mode = cnFlexFormService.parseExpression('__batchConfig.' + key, _this2.model).get();
+        var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this3.model).get();
 
-        _this2.models.forEach(function (model, i) {
+        _this3.models.forEach(function (model, i) {
           if (!models[i]) models[i] = {};
 
-          var val = cnFlexFormService.parseExpression(key, _this2.model).get();
+          var val = cnFlexFormService.parseExpression(key, _this3.model).get();
           var update = cnFlexFormService.parseExpression(key, models[i]);
-          var original = cnFlexFormService.parseExpression(key, _this2.models[i]);
+          var original = cnFlexFormService.parseExpression(key, _this3.models[i]);
 
-          _this2.setValue(val, update, original, mode);
+          _this3.setValue(val, update, original, mode);
         });
       });
 
@@ -403,6 +463,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         } else if (_.isString(originalVal)) {
           update.set(val.trim() + ' ' + originalVal);
         }
+      } else if (mode === 'increase') {
+        update.set(original.get() + val);
+      } else if (mode === 'decrease') {
+        update.set(original.get() - val);
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
@@ -417,19 +481,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       */
     }
 
-    function processString(field) {
+    function processDefault(field) {
       var config = field.batchConfig;
 
-      config.titleMap = config.titleMap || [{
-        name: 'Replace',
-        value: 'replace'
-      }, {
-        name: 'Prepend',
-        value: 'prepend'
-      }, {
-        name: 'Append',
-        value: 'append'
-      }];
+      config.editModes = config.editModes || ['replace', 'prepend', 'append'];
 
       config.default = config.default || 'append';
 
@@ -450,66 +505,59 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       };
     }
 
+    function processNumber(field) {
+      var config = field.batchConfig;
+
+      config.editModes = config.editModes || ['replace', 'decrease', 'increase'];
+
+      if (_.uniq(config.ogValues).length === 1) {
+        field.placeholder = _.first(config.ogValues);
+      } else {
+        field.placeholder = '—';
+      }
+    }
+
     function processSelect(field) {
-      var _this3 = this;
+      var _this4 = this;
 
       var type = field.schema.type;
       var config = field.batchConfig;
 
       if (type === 'array') {
-        config.titleMap = config.titleMap || [{
-          name: 'Replace',
-          value: 'replace'
-        }, {
-          name: 'Append',
-          value: 'append'
-        } /*, {
-           name: 'Remove',
-           value: 'remove'
-          }*/];
+        config.editModes = config.editModes || ['replace', 'append'];
 
         config.default = config.default || 'append';
 
         config.onSelect = {
           replace: function replace(prev) {
             if (prev !== 'append') {
-              cnFlexFormService.parseExpression(field.key, _this3.model).set([]);
+              cnFlexFormService.parseExpression(field.key, _this4.model).set([]);
             }
           },
           append: function append(prev) {
             if (prev !== 'replace') {
-              cnFlexFormService.parseExpression(field.key, _this3.model).set([]);
+              cnFlexFormService.parseExpression(field.key, _this4.model).set([]);
             }
           },
           remove: function remove() {
             var val = _.chain(field.batchConfig.ogValues).flatten().uniq().value();
-            cnFlexFormService.parseExpression(field.key, _this3.model).set(val);
+            cnFlexFormService.parseExpression(field.key, _this4.model).set(val);
           }
         };
       } else {
-        config.titleMap = config.titleMap || [{
-          name: 'Replace',
-          value: 'replace'
-        }];
 
-        config.default = config.default || 'replace';
-
-        //if(field.titleMap && !_.chain(field.titleMap).first().isObject().value()) {
-        //  field.placeholder = _.first(config.ogValues);
-        //}
-        //if(field.schema.type === 'object') {
         var first = _.first(config.ogValues);
-        if (_.isObject(first)) {
+        if (first && _.isObject(first)) {
           if (_.every(config.ogValues, first)) {
             field.placeholder = first[field.displayProperty || 'name'];
           }
-        } else if (_.uniq(config.ogValues).length === 1) {
+        } else if (first && _.uniq(config.ogValues).length === 1) {
           if (field.titleMap) {
             first = _.find(field.titleMap, _defineProperty({}, field.valueProperty || 'value', first));
           }
           field.placeholder = first[field.displayProperty || 'name'];
         }
-        //}
+
         if (!field.placeholder) {
           field.placeholder = '—';
         }
@@ -518,13 +566,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
     function processDate(field) {
       var config = field.batchConfig;
-
-      config.titleMap = config.titleMap || [{
-        name: 'Replace',
-        value: 'replace'
-      }];
-
-      config.default = config.default || 'replace';
 
       if (_.uniq(config.ogValues).length === 1) {
         field.placeholder = moment(_.first(config.ogValues)).format('M/DD/YYYY h:mm a');
@@ -536,14 +577,13 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function processToggle(field) {
       var config = field.batchConfig;
 
-      config.titleMap = config.titleMap || [{
-        name: 'Replace',
-        value: 'replace'
-      }];
-
-      config.default = config.default || 'replace';
-
-      if (_.uniq(config.ogValues).length === 1) {}
+      if (_.uniq(config.ogValues).length === 1) {
+        if (_.first(config.ogValues) == field.onValue) {
+          field.undefinedClass = 'semi-transparent';
+        } else {
+          field.undefinedClass = 'disabled semi-transparent';
+        }
+      }
     }
 
     function clearDefaults() {
@@ -601,7 +641,25 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function addMeta() {
-      this.schema.meta = '\n          <div class="well">\n            <h5>Edit Modes</h5>\n            <p>Some types of fields allow you to apply batch changes in\n            different ways:</p>\n            <dl>\n              <dt>Replace:</dt>\n              <dd>Replace all the original values\n              with the new value. <em>(If you don\'t see an <b>Edit Mode</b> option\n              for a field, this will be the default)</em></dd>\n            </dl>\n            <dl>\n              <dt>Prepend:</dt>\n              <dd>Add the new value to the start of the original\n              values for each item.</dd>\n            </dl>\n            <dl>\n              <dt>Append:</dt>\n              <dd>Affix the new value at the end of the original\n              values for each item.</dd>\n            </dl>\n          </div>';
+      this.schema.meta = '\n          <div class="well">\n            <h5>Edit Modes</h5>\n            <p>Some types of fields allow you to apply batch changes in\n            different ways:</p>\n            <dl>\n              <dt>Replace:</dt>\n              <dd>Replace all the original values\n              with the new value. <em>(If you don\'t see an <b>Edit Mode</b> option\n              for a field, this will be the default)</em></dd>\n            </dl>\n            ' + this.getEditModeLegends() + '\n          </div>';
+    }
+
+    function getEditModeLegends() {
+      var legends = '';
+
+      if (this.editModes.prepend) {
+        legends += '\n            <dl>\n              <dt>Prepend:</dt>\n              <dd>Add the new value to the start of the original\n              values for each item.</dd>\n            </dl>';
+      }
+      if (this.editModes.append) {
+        legends += '\n            <dl>\n              <dt>Append:</dt>\n              <dd>Affix the new value at the end of the original\n              values for each item.</dd>\n            </dl>';
+      }
+      if (this.editModes.decrease) {
+        legends += '\n            <dl>\n              <dt>Decrease:</dt>\n              <dd>Subtract the given value from the original\n              values for each item.</dd>\n            </dl>';
+      }
+      if (this.editModes.increase) {
+        legends += '\n            <dl>\n              <dt>Increase:</dt>\n              <dd>Add the given value to the original\n              values for each item.</dd>\n            </dl>';
+      }
+      return legends;
     }
   }
 })();

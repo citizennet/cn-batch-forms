@@ -19,12 +19,8 @@
       cnFlexFormModalLoaderServiceProvider) {
 
     cnFlexFormServiceProvider.registerField({
-      condition(field) {
-        return field.type === TYPE;
-      },
-      handler(field) {
-
-      },
+      condition: (field) => field.type === TYPE,
+      handler: (field) => {/*console.log('field.readonly:', field.key, field.readonly)*/},
       type: TYPE,
       templateUrl: TEMPLATE_URL
     });
@@ -46,6 +42,7 @@
                  ng-model="$$value$$"\
                  ng-model-options="form.ngModelOptions"\
                  sf-changed="form"\
+                 ng-disabled="form.readonly"\
                  name="{{form.key.slice(-1)[0]}}"/>\
         </div>'
     );

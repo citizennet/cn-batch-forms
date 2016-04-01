@@ -24,8 +24,10 @@
     let instances = 0;
 
     let fieldTypeHandlers = {
-      'string': processString,
+      'string': processDefault,
+      'number': processNumber,
       'cn-autocomplete': processSelect,
+      'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
       'cn-toggle': processToggle
     };
@@ -54,16 +56,20 @@
         closeModal,
         createDirtyCheck,
         createBatchField,
+        getChangedModels,
+        getEditModeLegends,
+        getModelValues,
+        getSchemaDefault,
+        getTitleMap,
         onFieldScope,
         processForm,
         processField,
         processItems,
         processDate,
-        processString,
+        processDefault,
+        processNumber,
         processSelect,
         processToggle,
-        getModelValues,
-        getChangedModels,
         setValue,
         showResults
       }).constructor(schema, model, models);
@@ -79,6 +85,7 @@
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.editModes = {};
       this.fieldRegister = {};
 
       this.clearDefaults();
@@ -108,11 +115,16 @@
     }
 
     function onFieldScope(event, scope) {
-      //console.log('onFieldScope:', scope.form.key, scope);
       let key = scope.form._key;
+      //console.log('onFieldScope:', key, scope.form.key, scope);
       if(key) {
         this.fieldRegister[key].ngModel = scope.ngModel;
       }
+      // prevent edit mode radiobuttons from setting form to dirty
+      else if(scope.form.key[0] === '__batchConfig') {
+        scope.ngModel.$pristine = false;
+      }
+
     }
 
     function processForm(form) {
@@ -125,7 +137,8 @@
       while(i > -1) {
         let child = field[children][i];
         let show = this.processField(child);
-        if(child.batchConfig) {
+        if(child.batchConfig && show) {
+          //console.log('child:', child);
           child.htmlClass = (child.htmlClass || '') + ' cn-batch-field';
           let batchField = this.createBatchField(child);
           let dirtyCheck = this.createDirtyCheck(child);
@@ -133,8 +146,10 @@
           field[children][i] = {
             type: 'section',
             htmlClass: 'cn-batch-wrapper',
-            items: [child, dirtyCheck, batchField]
+            items: [child, dirtyCheck, batchField],
+            condition: child.condition
           };
+          delete child.condition;
           this.fieldRegister[child.key] = {
             field: child
           };
@@ -175,28 +190,47 @@
       return true;
     }
 
+    function getTitleMap(editModes) {
+      editModes = editModes || ['replace'];
+
+      return editModes.map(value => {
+        this.editModes[value] = true;
+        return {
+          name: _.capitalize(value),
+          value
+        };
+      });
+    }
+
+    function getSchemaDefault(def) {
+      return def || 'replace';
+    }
+
     function createBatchField(field) {
+      let key = `__batchConfig["${field.key}"]`;
+
       let batchField = {
+        key,
         type: 'radiobuttons',
-        titleMap: field.batchConfig.titleMap,
-        key: `__batchConfig.${field.key}`,
+        titleMap: this.getTitleMap(field.batchConfig.editModes),
         htmlClass: 'cn-batch-options',
-        btnClass: 'btn-small'
+        btnClass: 'btn-sm cn-no-dirty-check'
       };
 
       if(batchField.titleMap.length === 1) {
         batchField.condition = 'false';
       }
 
-      this.addToSchema(field.key, '__batchConfig', {
+      this.addToSchema(key, {
         type: 'string',
         title: 'Edit Mode',
-        default: field.batchConfig.default
+        default: this.getSchemaDefault(field.batchConfig.default)
       });
 
       if(field.batchConfig.onSelect) {
         batchField.watch = {
           resolution: (val, prev) => {
+            console.log('field.batchConfig.onSelect, val, prev:', field.batchConfig.onSelect, val, prev);
             field.batchConfig.onSelect[val](prev);
           }
         };
@@ -206,44 +240,70 @@
     }
 
     function createDirtyCheck(field) {
+      let path = sfPath.parse(field.key);
+      let key = `__dirtyCheck["${path[0]}"]`;
+      let child = path.length > 1;
+      let htmlClass = '';
+
+      //if(child) htmlClass += ' semi-transparent';
+      if(field.notitle || !field.schema.title) htmlClass += ' notitle';
+
       let dirtyCheck = {
-        type: 'cn-dirty-check',
-        htmlClass: (field.notitle || !field.schema.title) ? 'notitle' : '',
-        key: `__dirtyCheck.${field.key}`
+        key,
+        htmlClass,
+        type: 'cn-dirty-check'
       };
 
-      this.addToSchema(field.key, '__dirtyCheck', {
+      this.addToSchema(key, {
         type: 'boolean',
         notitle: true
       });
 
-      if(field.watch) {
-        if(!_.isArray(field.watch)) field.watch = [field.watch];
-      }
-      else {
-        field.watch = [];
-      }
+      console.log('dirtyCheck:', field.key, dirtyCheck.readonly);
 
-      field.watch.push({
-        resolution: (val, prev) => {
-          if(!angular.equals(val, prev)) {
-            let register = this.fieldRegister[field.key];
-            if(register && register.ngModel.$dirty) {
-              cnFlexFormService.parseExpression(dirtyCheck.key, this.model).set(true);
+      if(!child) {
+        if(field.watch) {
+          if(!_.isArray(field.watch)) field.watch = [field.watch];
+        }
+        else {
+          field.watch = [];
+        }
+
+        field.watch.push({
+          resolution: (val, prev) => {
+            if(!angular.equals(val, prev)) {
+              let register = this.fieldRegister[field.key];
+              if(register) {
+                if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
+                  console.log('dirtyCheck.key:', dirtyCheck.key);
+                  cnFlexFormService.parseExpression(dirtyCheck.key, this.model).set(true);
+                }
+                else {
+                  console.log('initiated:', register);
+                  register.initiated = true;
+                }
+              }
+              // debug
+              else {
+                console.log('noregister:', register);
+              }
             }
           }
-        }
-      });
+        });
+      }
 
       return dirtyCheck;
     }
 
-    function addToSchema(key, start, schema) {
+    function addToSchema(key, schema) {
       let path = sfPath.parse(key);
-      let depth = this.schema.schema.properties[start];
+      let depth = this.schema.schema;
 
       path.forEach((k, i) => {
         if(i === path.length - 1) {
+          if(!depth.properties) {
+            depth.properties = {};
+          }
           depth.properties[k] = schema;
         }
         else if(k === '') {
@@ -279,14 +339,14 @@
 
       _.each(this.fieldRegister, (register, key) => {
         let dirty = cnFlexFormService
-            .parseExpression(`__dirtyCheck.${key}`, this.model)
+            .parseExpression(`__dirtyCheck["${key}"]`, this.model)
             .get();
 
         console.log('key, dirty:', key, dirty, register);
         if(!dirty) return;
 
         let mode = cnFlexFormService
-            .parseExpression(`__batchConfig.${key}`, this.model)
+            .parseExpression(`__batchConfig["${key}"]`, this.model)
             .get();
 
         this.models.forEach((model, i) => {
@@ -329,6 +389,12 @@
           update.set(`${val.trim()} ${originalVal}`);
         }
       }
+      else if(mode === 'increase') {
+        update.set(original.get() + val);
+      }
+      else if(mode === 'decrease') {
+        update.set(original.get() - val);
+      }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
          have different properties
@@ -342,19 +408,10 @@
       */
     }
 
-    function processString(field) {
+    function processDefault(field) {
       let config = field.batchConfig;
 
-      config.titleMap = config.titleMap || [{
-            name: 'Replace',
-            value: 'replace'
-          }, {
-            name: 'Prepend',
-            value: 'prepend'
-          }, {
-            name: 'Append',
-            value: 'append'
-          }];
+      config.editModes = config.editModes || ['replace', 'prepend', 'append'];
 
       config.default = config.default || 'append';
 
@@ -376,21 +433,25 @@
       };
     }
 
-    function processSelect(field) {
+    function processNumber(field) {
+      let config = field.batchConfig;
+
+      config.editModes = config.editModes || ['replace', 'decrease', 'increase'];
+
+      if(_.uniq(config.ogValues).length === 1) {
+        field.placeholder = _.first(config.ogValues);
+      }
+      else {
+        field.placeholder = '—';
+      }
+    }
+
+    function  processSelect(field) {
       let type = field.schema.type;
       let config = field.batchConfig;
 
       if(type === 'array') {
-        config.titleMap = config.titleMap || [{
-          name: 'Replace',
-          value: 'replace'
-        }, {
-          name: 'Append',
-          value: 'append'
-        }/*, {
-          name: 'Remove',
-          value: 'remove'
-        }*/];
+        config.editModes = config.editModes || ['replace', 'append'];
 
         config.default = config.default || 'append';
 
@@ -412,30 +473,20 @@
         };
       }
       else {
-        config.titleMap = config.titleMap || [{
-          name: 'Replace',
-          value: 'replace'
-        }];
 
-        config.default = config.default || 'replace';
-
-        //if(field.titleMap && !_.chain(field.titleMap).first().isObject().value()) {
-        //  field.placeholder = _.first(config.ogValues);
-        //}
-        //if(field.schema.type === 'object') {
         let first = _.first(config.ogValues);
-        if(_.isObject(first)) {
+        if(first && _.isObject(first)) {
           if(_.every(config.ogValues, first)) {
             field.placeholder = first[field.displayProperty || 'name'];
           }
         }
-        else if(_.uniq(config.ogValues).length === 1) {
+        else if(first && _.uniq(config.ogValues).length === 1) {
           if(field.titleMap) {
             first = _.find(field.titleMap, {[field.valueProperty || 'value']: first});
           }
           field.placeholder = first[field.displayProperty || 'name'];
         }
-        //}
+
         if(!field.placeholder) {
           field.placeholder = '—';
         }
@@ -444,13 +495,6 @@
 
     function processDate(field) {
       let config = field.batchConfig;
-
-      config.titleMap = config.titleMap || [{
-            name: 'Replace',
-            value: 'replace'
-          }];
-
-      config.default = config.default || 'replace';
 
       if(_.uniq(config.ogValues).length === 1) {
         field.placeholder = moment(_.first(config.ogValues)).format('M/DD/YYYY h:mm a');
@@ -463,15 +507,13 @@
     function processToggle(field) {
       let config = field.batchConfig;
 
-      config.titleMap = config.titleMap || [{
-            name: 'Replace',
-            value: 'replace'
-          }];
-
-      config.default = config.default || 'replace';
-
       if(_.uniq(config.ogValues).length === 1) {
-
+        if(_.first(config.ogValues) == field.onValue) {
+          field.undefinedClass = 'semi-transparent';
+        }
+        else {
+          field.undefinedClass = 'disabled semi-transparent';
+        }
       }
     }
 
@@ -540,17 +582,46 @@
               with the new value. <em>(If you don't see an <b>Edit Mode</b> option
               for a field, this will be the default)</em></dd>
             </dl>
+            ${this.getEditModeLegends()}
+          </div>`;
+    }
+
+    function getEditModeLegends() {
+      let legends = '';
+
+      if(this.editModes.prepend) {
+        legends += `
             <dl>
               <dt>Prepend:</dt>
               <dd>Add the new value to the start of the original
               values for each item.</dd>
-            </dl>
+            </dl>`;
+      }
+      if(this.editModes.append) {
+        legends += `
             <dl>
               <dt>Append:</dt>
               <dd>Affix the new value at the end of the original
               values for each item.</dd>
-            </dl>
-          </div>`;
+            </dl>`;
+      }
+      if(this.editModes.decrease) {
+        legends += `
+            <dl>
+              <dt>Decrease:</dt>
+              <dd>Subtract the given value from the original
+              values for each item.</dd>
+            </dl>`;
+      }
+      if(this.editModes.increase) {
+        legends += `
+            <dl>
+              <dt>Increase:</dt>
+              <dd>Add the given value to the original
+              values for each item.</dd>
+            </dl>`;
+      }
+      return legends;
     }
   }
 
