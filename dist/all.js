@@ -567,7 +567,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           if (titleMap /* && !_.isObject(first)*/) {
               first = _.find(titleMap, _defineProperty({}, field.valueProperty || 'value', first));
             }
-          field.placeholder = first[field.displayProperty || 'name'];
+          field.placeholder = first && first[field.displayProperty || 'name'];
         }
 
         if (!field.placeholder) {

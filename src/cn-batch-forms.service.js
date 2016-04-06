@@ -495,7 +495,7 @@
           if(titleMap/* && !_.isObject(first)*/) {
             first = _.find(titleMap, {[field.valueProperty || 'value']: first});
           }
-          field.placeholder = first[field.displayProperty || 'name'];
+          field.placeholder = first && first[field.displayProperty || 'name'];
         }
 
         if(!field.placeholder) {
