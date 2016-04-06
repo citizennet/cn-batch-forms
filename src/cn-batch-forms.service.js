@@ -62,6 +62,7 @@
         getSchemaDefault,
         getTitleMap,
         onFieldScope,
+        processCondition,
         processForm,
         processField,
         processItems,
@@ -147,7 +148,7 @@
             type: 'section',
             htmlClass: 'cn-batch-wrapper',
             items: [child, dirtyCheck, batchField],
-            condition: child.condition
+            condition: this.processCondition(child.condition)
           };
           delete child.condition;
           this.fieldRegister[child.key] = {
@@ -160,6 +161,10 @@
         }
         --i;
       }
+    }
+
+    function processCondition(condition) {
+      return condition && condition.replace(/\b(model)\.(\S*)\b/g, '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)');
     }
 
     function processField(field) {
@@ -178,6 +183,12 @@
         if(handler) {
           if(!_.isObject(field.batchConfig)) field.batchConfig = {};
           field.batchConfig.ogValues = this.getModelValues(field);
+
+          if(_.allEqual(field.batchConfig.ogValues)) {
+            let key = `__ogValues["${field.key}"]`;
+            let first = _.first(field.batchConfig.ogValues);
+            cnFlexFormService.parseExpression(key, this.model).set(first);
+          }
 
           handler.bind(this)(field);
         }
@@ -275,7 +286,7 @@
               let register = this.fieldRegister[field.key];
               if(register) {
                 if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
-                  console.log('dirtyCheck.key:', dirtyCheck.key);
+                  //console.log('dirtyCheck.key:', dirtyCheck.key);
                   cnFlexFormService.parseExpression(dirtyCheck.key, this.model).set(true);
                 }
                 else {
@@ -417,7 +428,7 @@
 
       config.onSelect = {
         replace: () => {
-          if(_.uniq(config.ogValues).length === 1) {
+          if(_.allEqual(config.ogValues)) {
             field.placeholder = _.first(config.ogValues);
           }
           else {
@@ -438,12 +449,14 @@
 
       config.editModes = config.editModes || ['replace', 'decrease', 'increase'];
 
-      if(_.uniq(config.ogValues).length === 1) {
+      if(_.allEqual(config.ogValues)) {
         field.placeholder = _.first(config.ogValues);
       }
       else {
         field.placeholder = '—';
       }
+
+      console.log('number placeholder:', field.placeholder);
     }
 
     function  processSelect(field) {
@@ -475,14 +488,12 @@
       else {
 
         let first = _.first(config.ogValues);
-        if(first && _.isObject(first)) {
-          if(_.every(config.ogValues, first)) {
-            field.placeholder = first[field.displayProperty || 'name'];
-          }
-        }
-        else if(first && _.uniq(config.ogValues).length === 1) {
-          if(field.titleMap) {
-            first = _.find(field.titleMap, {[field.valueProperty || 'value']: first});
+        //TODO: dynamically send back data
+        if(first && _.allEqual(config.ogValues)) {
+          let titleMap = field.titleMap || (field.titleMapResolve && this.schema.data[field.titleMapResolve]);
+          console.log('titleMap, first:', titleMap, first);
+          if(titleMap/* && !_.isObject(first)*/) {
+            first = _.find(titleMap, {[field.valueProperty || 'value']: first});
           }
           field.placeholder = first[field.displayProperty || 'name'];
         }
@@ -496,7 +507,7 @@
     function processDate(field) {
       let config = field.batchConfig;
 
-      if(_.uniq(config.ogValues).length === 1) {
+      if(_.allEqual(config.ogValues)) {
         field.placeholder = moment(_.first(config.ogValues)).format('M/DD/YYYY h:mm a');
       }
       else {
@@ -507,7 +518,7 @@
     function processToggle(field) {
       let config = field.batchConfig;
 
-      if(_.uniq(config.ogValues).length === 1) {
+      if(_.allEqual(config.ogValues)) {
         if(_.first(config.ogValues) == field.onValue) {
           field.undefinedClass = 'semi-transparent';
         }
