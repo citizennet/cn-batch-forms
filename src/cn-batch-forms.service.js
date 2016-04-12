@@ -26,6 +26,7 @@
     let fieldTypeHandlers = {
       'string': processDefault,
       'number': processNumber,
+      'url': 'processDefault',
       'cn-autocomplete': processSelect,
       'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
@@ -140,14 +141,14 @@
         let show = this.processField(child);
         if(child.batchConfig && show) {
           //console.log('child:', child);
-          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field';
+          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
           let batchField = this.createBatchField(child);
-          let dirtyCheck = this.createDirtyCheck(child);
+          let dirtyCheck = child.key && this.createDirtyCheck(child);
           // add mode buttons after field
           field[children][i] = {
             type: 'section',
             htmlClass: 'cn-batch-wrapper',
-            items: [child, dirtyCheck, batchField],
+            items: dirtyCheck ? [child, dirtyCheck, batchField] : [child, batchField],
             condition: this.processCondition(child.condition)
           };
           delete child.condition;
@@ -195,8 +196,31 @@
         else return false;
       }
       else if(field.items) {
+        if(field.batchConfig) {
+          field.items.forEach(child => {
+            child.batchConfig = _.clone(field.batchConfig);
+          });
+        }
         this.processItems(field);
         if(!field.items.length) return false;
+
+        if(field.batchConfig) {
+          if(!_.isObject(field.batchConfig)) field.batchConfig = {};
+          field.batchConfig.key = `component_${_.uniqueId()}`;
+          field.batchConfig.watch = [];
+
+          field.items.forEach((item, i) => {
+            let child = item.items[0];
+            if(!i) {
+              field.batchConfig.editModes = child.batchConfig.editModes;
+              field.batchConfig.default = child.batchConfig.default;
+            }
+            field.batchConfig.watch.push({
+              resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
+            });
+            item.items[2].condition = 'false';
+          });
+        }
       }
       return true;
     }
@@ -218,14 +242,16 @@
     }
 
     function createBatchField(field) {
-      let key = `__batchConfig["${field.key}"]`;
+      let batchConfig = field.batchConfig;
+      let key = `__batchConfig["${field.key || batchConfig.key}"]`;
 
       let batchField = {
         key,
         type: 'radiobuttons',
-        titleMap: this.getTitleMap(field.batchConfig.editModes),
+        titleMap: this.getTitleMap(batchConfig.editModes),
         htmlClass: 'cn-batch-options',
-        btnClass: 'btn-sm cn-no-dirty-check'
+        btnClass: 'btn-sm cn-no-dirty-check',
+        watch: batchConfig.watch || []
       };
 
       if(batchField.titleMap.length === 1) {
@@ -235,16 +261,17 @@
       this.addToSchema(key, {
         type: 'string',
         title: 'Edit Mode',
-        default: this.getSchemaDefault(field.batchConfig.default)
+        default: this.getSchemaDefault(batchConfig.default)
       });
 
-      if(field.batchConfig.onSelect) {
-        batchField.watch = {
+      if(batchConfig.onSelect) {
+        batchField.watch.push({
           resolution: (val, prev) => {
-            console.log('field.batchConfig.onSelect, val, prev:', field.batchConfig.onSelect, val, prev);
-            field.batchConfig.onSelect[val](prev);
+            if(!val) return;
+            console.log('batchConfig.onSelect, val, prev:', batchConfig.onSelect, val, prev);
+            batchConfig.onSelect[val](prev);
           }
-        };
+        });
       }
 
       return batchField;
@@ -269,8 +296,6 @@
         type: 'boolean',
         notitle: true
       });
-
-      console.log('dirtyCheck:', field.key, dirtyCheck.readonly);
 
       if(!child) {
         if(field.watch) {
@@ -353,7 +378,6 @@
             .parseExpression(`__dirtyCheck["${key}"]`, this.model)
             .get();
 
-        console.log('key, dirty:', key, dirty, register);
         if(!dirty) return;
 
         let mode = cnFlexFormService
@@ -519,7 +543,7 @@
       let config = field.batchConfig;
 
       if(_.allEqual(config.ogValues)) {
-        if(_.first(config.ogValues) == field.onValue) {
+        if(_.first(config.ogValues) == (field.onValue || true)) {
           field.undefinedClass = 'semi-transparent';
         }
         else {
@@ -529,7 +553,7 @@
     }
 
     function clearDefaults() {
-      this.schema.schema.required = [];
+      this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
 
       this.schema.schema.properties.__batchConfig = {
@@ -546,6 +570,7 @@
     function clearSchemaDefault(schema) {
       schema.default = undefined;
       if(schema.type === 'object' && schema.properties) {
+        schema.required = undefined;
         _.each(schema.properties, this.clearSchemaDefault.bind(this));
       }
       else if(schema.type === 'array' && schema.items) {

@@ -113,6 +113,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     var fieldTypeHandlers = {
       'string': processDefault,
       'number': processNumber,
+      'url': 'processDefault',
       'cn-autocomplete': processSelect,
       'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
@@ -227,14 +228,14 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         var show = this.processField(child);
         if (child.batchConfig && show) {
           //console.log('child:', child);
-          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field';
+          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
           var batchField = this.createBatchField(child);
-          var dirtyCheck = this.createDirtyCheck(child);
+          var dirtyCheck = child.key && this.createDirtyCheck(child);
           // add mode buttons after field
           field[children][i] = {
             type: 'section',
             htmlClass: 'cn-batch-wrapper',
-            items: [child, dirtyCheck, batchField],
+            items: dirtyCheck ? [child, dirtyCheck, batchField] : [child, batchField],
             condition: this.processCondition(child.condition)
           };
           delete child.condition;
@@ -280,8 +281,31 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           handler.bind(this)(field);
         } else return false;
       } else if (field.items) {
+        if (field.batchConfig) {
+          field.items.forEach(function (child) {
+            child.batchConfig = _.clone(field.batchConfig);
+          });
+        }
         this.processItems(field);
         if (!field.items.length) return false;
+
+        if (field.batchConfig) {
+          if (!_.isObject(field.batchConfig)) field.batchConfig = {};
+          field.batchConfig.key = 'component_' + _.uniqueId();
+          field.batchConfig.watch = [];
+
+          field.items.forEach(function (item, i) {
+            var child = item.items[0];
+            if (!i) {
+              field.batchConfig.editModes = child.batchConfig.editModes;
+              field.batchConfig.default = child.batchConfig.default;
+            }
+            field.batchConfig.watch.push({
+              resolution: 'model.__batchConfig["' + child.key + '"] = model.__batchConfig["' + field.batchConfig.key + '"]'
+            });
+            item.items[2].condition = 'false';
+          });
+        }
       }
       return true;
     }
@@ -305,14 +329,16 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function createBatchField(field) {
-      var key = '__batchConfig["' + field.key + '"]';
+      var batchConfig = field.batchConfig;
+      var key = '__batchConfig["' + (field.key || batchConfig.key) + '"]';
 
       var batchField = {
         key: key,
         type: 'radiobuttons',
-        titleMap: this.getTitleMap(field.batchConfig.editModes),
+        titleMap: this.getTitleMap(batchConfig.editModes),
         htmlClass: 'cn-batch-options',
-        btnClass: 'btn-sm cn-no-dirty-check'
+        btnClass: 'btn-sm cn-no-dirty-check',
+        watch: batchConfig.watch || []
       };
 
       if (batchField.titleMap.length === 1) {
@@ -322,16 +348,17 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       this.addToSchema(key, {
         type: 'string',
         title: 'Edit Mode',
-        default: this.getSchemaDefault(field.batchConfig.default)
+        default: this.getSchemaDefault(batchConfig.default)
       });
 
-      if (field.batchConfig.onSelect) {
-        batchField.watch = {
+      if (batchConfig.onSelect) {
+        batchField.watch.push({
           resolution: function resolution(val, prev) {
-            console.log('field.batchConfig.onSelect, val, prev:', field.batchConfig.onSelect, val, prev);
-            field.batchConfig.onSelect[val](prev);
+            if (!val) return;
+            console.log('batchConfig.onSelect, val, prev:', batchConfig.onSelect, val, prev);
+            batchConfig.onSelect[val](prev);
           }
-        };
+        });
       }
 
       return batchField;
@@ -358,8 +385,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         type: 'boolean',
         notitle: true
       });
-
-      console.log('dirtyCheck:', field.key, dirtyCheck.readonly);
 
       if (!child) {
         if (field.watch) {
@@ -438,7 +463,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       _.each(this.fieldRegister, function (register, key) {
         var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this3.model).get();
 
-        console.log('key, dirty:', key, dirty, register);
         if (!dirty) return;
 
         var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this3.model).get();
@@ -590,7 +614,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var config = field.batchConfig;
 
       if (_.allEqual(config.ogValues)) {
-        if (_.first(config.ogValues) == field.onValue) {
+        if (_.first(config.ogValues) == (field.onValue || true)) {
           field.undefinedClass = 'semi-transparent';
         } else {
           field.undefinedClass = 'disabled semi-transparent';
@@ -599,7 +623,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function clearDefaults() {
-      this.schema.schema.required = [];
+      this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
 
       this.schema.schema.properties.__batchConfig = {
@@ -616,6 +640,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function clearSchemaDefault(schema) {
       schema.default = undefined;
       if (schema.type === 'object' && schema.properties) {
+        schema.required = undefined;
         _.each(schema.properties, this.clearSchemaDefault.bind(this));
       } else if (schema.type === 'array' && schema.items) {
         this.clearSchemaDefault(schema.items);
