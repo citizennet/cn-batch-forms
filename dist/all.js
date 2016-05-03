@@ -5,25 +5,28 @@
 })();
 'use strict';
 
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
 (function () {
   'use strict';
 
   angular.module('cn.batch-forms').controller('BatchResults', BatchResults);
 
-  BatchResults.$inject = ['$state', 'parent', '$timeout'];
+  BatchResults.$inject = ['$state', 'parent', '$stateParams'];
 
-  function BatchResults($state, parent, $timeout) {
+  function BatchResults($state, parent, $stateParams) {
 
     var vm = this;
     vm.parent = parent;
     vm.results = vm.parent.results;
+    //vm.errors = _.reject(vm.results, {status: 200});
     vm.originals = vm.parent.models;
     vm.config = vm.parent.resultsConfig;
     vm.displayName = vm.config && vm.config.displayName || 'name';
+    vm.formName = $state.current.name;
 
     vm.activate = activate;
-    vm.cancel = cancel;
-    vm.done = cancel;
+    vm.submit = submit;
 
     vm.activate();
 
@@ -31,10 +34,12 @@
 
     function activate() {
       console.log('vm.parent:', vm.parent);
-
-      if (!vm.results) {
-        // the modal doesn't go away without the timeout
-        $timeout(vm.cancel);
+      if (vm.config.idParam) {
+        vm.results.forEach(function (result, i) {
+          var params = _.assign({}, $stateParams, _defineProperty({}, vm.config.idParam, vm.originals[i].id));
+          result.editSref = $state.current.name + '(' + angular.toJson(params) + ')';
+          console.log('result.editSref:', result);
+        });
       }
 
       vm.headerConfig = {
@@ -43,15 +48,26 @@
         },
         actionConfig: {
           actions: [{
-            text: 'Cool'
+            text: 'Continue Editing'
+          }, {
+            text: 'Done',
+            handler: function handler() {
+              if (vm.config && vm.config.returnState) {
+                $state.go(vm.config.returnState.name, vm.config.returnState.params);
+              }
+            }
           }]
         },
         noData: true
       };
     }
 
-    function cancel() {
-      $state.go('^');
+    function submit(handler) {
+      console.log('submit:', handler);
+      vm.parent.closeModal();
+      if (handler) {
+        handler();
+      }
     }
   }
 })();
@@ -65,10 +81,9 @@
   var TYPE = 'cn-dirty-check';
   var TEMPLATE_URL = 'cn-batch-forms/cn-dirty-check.html';
 
-  cnBatchFormsConfig.$inject = ['cnFlexFormServiceProvider', 'cnFlexFormModalLoaderServiceProvider'];
+  cnBatchFormsConfig.$inject = ['cnFlexFormServiceProvider'];
 
-  function cnBatchFormsConfig(cnFlexFormServiceProvider, cnFlexFormModalLoaderServiceProvider) {
-
+  function cnBatchFormsConfig(cnFlexFormServiceProvider) {
     cnFlexFormServiceProvider.registerField({
       condition: function condition(field) {
         return field.type === TYPE;
@@ -76,12 +91,6 @@
       handler: function handler(field) {/*console.log('field.readonly:', field.key, field.readonly)*/},
       type: TYPE,
       templateUrl: TEMPLATE_URL
-    });
-
-    cnFlexFormModalLoaderServiceProvider.addMapping('results', {
-      controller: 'BatchResults',
-      controllerAs: 'vm',
-      templateUrl: 'cn-batch-forms/batch-results.html'
     });
   }
 
@@ -105,8 +114,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 (function () {
   angular.module('cn.batch-forms').factory('cnBatchForms', cnBatchForms);
 
-  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$state', '$timeout', 'cnFlexFormModalLoaderService'];
-  function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $state, $timeout, cnFlexFormModalLoaderService) {
+  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$state', '$timeout', 'cnModal'];
+  function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $state, $timeout, cnModal) {
 
     var instances = 0;
 
@@ -168,7 +177,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       console.log('BatchForms:', schema, model, models);
 
       this.instance = instances;
-      cnFlexFormModalLoaderService.resolveMapping('results', this.instance, this);
+      //cnFlexFormModalLoaderService.resolveMapping('results', this.instance, this);
       instances++;
 
       this.schema = schema;
@@ -355,7 +364,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         batchField.watch.push({
           resolution: function resolution(val, prev) {
             if (!val) return;
-            console.log('batchConfig.onSelect, val, prev:', batchConfig.onSelect, val, prev);
             batchConfig.onSelect[val](prev);
           }
         });
@@ -402,7 +410,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
                   //console.log('dirtyCheck.key:', dirtyCheck.key);
                   cnFlexFormService.parseExpression(dirtyCheck.key, _this2.model).set(true);
                 } else {
-                  console.log('initiated:', register);
                   register.initiated = true;
                 }
               }
@@ -550,8 +557,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       } else {
         field.placeholder = '—';
       }
-
-      console.log('number placeholder:', field.placeholder);
     }
 
     function processSelect(field) {
@@ -587,7 +592,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         //TODO: dynamically send back data
         if (first && _.allEqual(config.ogValues)) {
           var titleMap = field.titleMap || field.titleMapResolve && this.schema.data[field.titleMapResolve];
-          console.log('titleMap, first:', titleMap, first);
           if (titleMap /* && !_.isObject(first)*/) {
               first = _.find(titleMap, _defineProperty({}, field.valueProperty || 'value', first));
             }
@@ -648,31 +652,29 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function showResults(results, config) {
-      console.log('showResults:', results, this);
+      var _this5 = this;
+
       this.results = results;
       this.resultsConfig = config;
 
-      $state.go('.modal', {
-        modal: 'results',
-        modalId: this.instance
-      });
-
-      this.onCloseModal = $rootScope.$on('$stateChangeStart', this.closeModal.bind(this));
-    }
-
-    function closeModal(e, toState, toParams) {
-      console.log('closeModal:', e, toState, toParams);
-      console.log('this.resultsConfig:', this.resultsConfig);
-      this.onCloseModal();
-
-      var config = this.resultsConfig;
-      if (config && config.returnState) {
-        //timeout needed so current state
-        $timeout(function () {
-          return $state.go(config.returnState.name, config.returnState.params);
-        });
+      if (this.modal) {
+        this.modal.close();
       }
 
+      this.modal = cnModal.open({
+        controller: 'BatchResults',
+        controllerAs: 'vm',
+        templateUrl: 'cn-batch-forms/batch-results.html',
+        resolve: {
+          parent: function parent() {
+            return _this5;
+          }
+        }
+      });
+    }
+
+    function closeModal() {
+      this.modal.close();
       this.results = [];
       this.resultsConfig = null;
     }
@@ -703,5 +705,5 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 "use strict";
 
 angular.module("cn.batch-forms").run(["$templateCache", function ($templateCache) {
-  $templateCache.put("cn-batch-forms/batch-results.html", "<div class=\"cn-modal\">\n  <div class=\"modal-header clearfix\">\n    <cn-flex-form-header\n      ff-header-config=\"vm.headerConfig\"\n      ff-submit=\"vm.done()\">\n    </cn-flex-form-header>\n  </div>\n  <div class=\"modal-body cn-list\"\n       cn-responsive-height=\"80\"\n       cn-responsive-break=\"sm\"\n       cn-set-max-height>\n    <ul class=\"list-group gutterless\">\n      <li ng-repeat=\"result in vm.results\"\n          class=\"list-group-item\"\n          ng-class=\"{\n            \'text-danger\': result.status != 200,\n            \'text-primary\': result.status == 200\n          }\">\n        <div class=\"row\">\n          <div class=\"col-sm-1 text-center\">\n            <i class=\"fa fa-{{result.status == 200 ? \'check\' : \'times\'}}\"></i>\n          </div>\n          <div class=\"col-sm-11\"\n               ng-show=\"result.status == 200\">\n            {{result.body[vm.displayName]}} ({{result.body.id}}):\n            updated successfully\n          </div>\n          <div class=\"col-sm-11\"\n               ng-show=\"result.status != 200\">\n            {{vm.originals[$index][vm.displayName]}} ({{vm.originals[$index].id}}):\n            {{result.body.message}}\n          </div>\n        </div>\n      </li>\n    </ul>\n  </div>\n</div>\n");
+  $templateCache.put("cn-batch-forms/batch-results.html", "<div class=\"cn-modal\">\n  <div class=\"modal-header clearfix\">\n    <cn-flex-form-header\n      ff-header-config=\"vm.headerConfig\"\n      ff-submit=\"vm.submit(handler)\">\n    </cn-flex-form-header>\n  </div>\n  <div class=\"modal-body cn-list\"\n       cn-responsive-height=\"80\"\n       cn-responsive-break=\"sm\"\n       cn-set-max-height>\n    <table class=\"table card-flex gutterless\">\n      <tbody>\n      <tr ng-repeat=\"result in vm.results\">\n        <td class=\"col-sm-10\">\n          <h6 ng-show=\"result.status == 200\">\n            {{result.body[vm.displayName]}}\n            <span class=\"text-mute\">({{result.body.id}})</span>\n          </h6>\n          <h6 ng-show=\"result.status != 200\">\n            {{vm.originals[$index][vm.displayName]}}\n            <span class=\"text-mute\">({{vm.originals[$index].id}})</span>\n          </h6>\n          <p ng-class=\"{\n               \'text-danger\': result.status != 200,\n               \'text-primary\': result.status == 200\n             }\">\n            <i class=\"fa fa-{{result.status == 200 ? \'check\' : \'times\'}}\"></i>\n            {{result.status == 200 ? \'updated successfully\' : result.body.message}}\n          </p>\n        </td>\n        <td class=\"col-sm-2 text-center\">\n          <a ng-show=\"result.editSref\"\n             class=\"btn btn-sm btn-transparent\"\n             ui-sref=\"{{result.editSref}}\">\n            <i class=\"icn-edit\"></i>\n          </a>\n        </td>\n      </tr>\n      </tbody>\n    </table>\n  </div>\n</div>\n");
 }]);
