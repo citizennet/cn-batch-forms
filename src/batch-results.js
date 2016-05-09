@@ -5,20 +5,21 @@
       .module('cn.batch-forms')
       .controller('BatchResults', BatchResults);
 
-  BatchResults.$inject = ['$state', 'parent', '$timeout'];
+  BatchResults.$inject = ['$state', 'parent', '$stateParams'];
 
-  function BatchResults($state, parent, $timeout) {
+  function BatchResults($state, parent, $stateParams) {
 
     var vm = this;
     vm.parent = parent;
     vm.results = vm.parent.results;
+    //vm.errors = _.reject(vm.results, {status: 200});
     vm.originals = vm.parent.models;
     vm.config = vm.parent.resultsConfig;
     vm.displayName = vm.config && vm.config.displayName || 'name';
+    vm.formName = $state.current.name;
 
     vm.activate = activate;
-    vm.cancel = cancel;
-    vm.done = cancel;
+    vm.submit = submit;
 
     vm.activate();
 
@@ -26,10 +27,12 @@
 
     function activate() {
       console.log('vm.parent:', vm.parent);
-
-      if(!vm.results) {
-        // the modal doesn't go away without the timeout
-        $timeout(vm.cancel);
+      if(vm.config.idParam) {
+        vm.results.forEach((result, i) => {
+          let params = _.assign({}, $stateParams, {[vm.config.idParam]: vm.originals[i].id});
+          result.editSref = `${$state.current.name}(${angular.toJson(params)})`;
+          console.log('result.editSref:', result);
+        });
       }
 
       vm.headerConfig = {
@@ -38,15 +41,27 @@
         },
         actionConfig: {
           actions: [{
-            text: 'Cool'
+            text: 'Continue Editing'
+          }, {
+            text: 'Done',
+            handler: () => {
+              if(vm.config && vm.config.returnState) {
+                $state.go(vm.config.returnState.name, vm.config.returnState.params);
+              }
+            }
           }]
         },
         noData: true
       };
+
     }
 
-    function cancel() {
-      $state.go('^');
+    function submit(handler) {
+      console.log('submit:', handler);
+      vm.parent.closeModal();
+      if(handler) {
+        handler();
+      }
     }
 
   }

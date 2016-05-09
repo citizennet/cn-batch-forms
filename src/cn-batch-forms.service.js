@@ -10,7 +10,7 @@
     '$rootScope',
     '$state',
     '$timeout',
-    'cnFlexFormModalLoaderService'
+    'cnModal'
   ];
   function cnBatchForms(
       cnFlexFormService,
@@ -19,7 +19,7 @@
       $rootScope,
       $state,
       $timeout,
-      cnFlexFormModalLoaderService) {
+      cnModal) {
 
     let instances = 0;
 
@@ -81,7 +81,7 @@
       console.log('BatchForms:', schema, model, models);
 
       this.instance = instances;
-      cnFlexFormModalLoaderService.resolveMapping('results', this.instance, this);
+      //cnFlexFormModalLoaderService.resolveMapping('results', this.instance, this);
       instances++;
 
       this.schema = schema;
@@ -268,7 +268,6 @@
         batchField.watch.push({
           resolution: (val, prev) => {
             if(!val) return;
-            console.log('batchConfig.onSelect, val, prev:', batchConfig.onSelect, val, prev);
             batchConfig.onSelect[val](prev);
           }
         });
@@ -315,7 +314,6 @@
                   cnFlexFormService.parseExpression(dirtyCheck.key, this.model).set(true);
                 }
                 else {
-                  console.log('initiated:', register);
                   register.initiated = true;
                 }
               }
@@ -479,8 +477,6 @@
       else {
         field.placeholder = '—';
       }
-
-      console.log('number placeholder:', field.placeholder);
     }
 
     function  processSelect(field) {
@@ -515,7 +511,6 @@
         //TODO: dynamically send back data
         if(first && _.allEqual(config.ogValues)) {
           let titleMap = field.titleMap || (field.titleMapResolve && this.schema.data[field.titleMapResolve]);
-          console.log('titleMap, first:', titleMap, first);
           if(titleMap/* && !_.isObject(first)*/) {
             first = _.find(titleMap, {[field.valueProperty || 'value']: first});
           }
@@ -579,29 +574,25 @@
     }
 
     function showResults(results, config) {
-      console.log('showResults:', results, this);
       this.results = results;
       this.resultsConfig = config;
 
-      $state.go('.modal', {
-        modal: 'results',
-        modalId: this.instance
-      });
-
-      this.onCloseModal = $rootScope.$on('$stateChangeStart', this.closeModal.bind(this));
-    }
-
-    function closeModal(e, toState, toParams) {
-      console.log('closeModal:', e, toState, toParams);
-      console.log('this.resultsConfig:', this.resultsConfig);
-      this.onCloseModal();
-
-      let config = this.resultsConfig;
-      if(config && config.returnState) {
-        //timeout needed so current state
-        $timeout(() => $state.go(config.returnState.name, config.returnState.params));
+      if(this.modal) {
+        this.modal.close();
       }
 
+      this.modal = cnModal.open({
+        controller: 'BatchResults',
+        controllerAs: 'vm',
+        templateUrl: 'cn-batch-forms/batch-results.html',
+        resolve: {
+          parent: () => this
+        }
+      });
+    }
+
+    function closeModal() {
+      this.modal.close();
       this.results = [];
       this.resultsConfig = null;
     }

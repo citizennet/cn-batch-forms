@@ -9,26 +9,14 @@
   const TYPE = 'cn-dirty-check';
   const TEMPLATE_URL = 'cn-batch-forms/cn-dirty-check.html';
 
-  cnBatchFormsConfig.$inject = [
-    'cnFlexFormServiceProvider',
-    'cnFlexFormModalLoaderServiceProvider'
-  ];
+  cnBatchFormsConfig.$inject = ['cnFlexFormServiceProvider'];
 
-  function cnBatchFormsConfig(
-      cnFlexFormServiceProvider,
-      cnFlexFormModalLoaderServiceProvider) {
-
+  function cnBatchFormsConfig(cnFlexFormServiceProvider) {
     cnFlexFormServiceProvider.registerField({
       condition: (field) => field.type === TYPE,
       handler: (field) => {/*console.log('field.readonly:', field.key, field.readonly)*/},
       type: TYPE,
       templateUrl: TEMPLATE_URL
-    });
-
-    cnFlexFormModalLoaderServiceProvider.addMapping('results', {
-      controller: 'BatchResults',
-      controllerAs: 'vm',
-      templateUrl: 'cn-batch-forms/batch-results.html'
     });
   }
 
