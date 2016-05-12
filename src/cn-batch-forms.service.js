@@ -56,6 +56,7 @@
         clearSchemaDefault,
         closeModal,
         createDirtyCheck,
+        processLinks,
         createBatchField,
         getChangedModels,
         getEditModeLegends,
@@ -89,6 +90,7 @@
       this.models = models;
       this.editModes = {};
       this.fieldRegister = {};
+      this.links = [];
 
       this.clearDefaults();
 
@@ -108,6 +110,7 @@
       }
 
       this.addMeta();
+      this.processLinks();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
 
@@ -153,7 +156,8 @@
           };
           delete child.condition;
           this.fieldRegister[child.key] = {
-            field: child
+            field: child,
+            dirtyCheck
           };
         }
         if(!show) {
@@ -324,9 +328,50 @@
             }
           }
         });
+
+        if (field.batchConfig.link) {
+          this.links.push({
+            key: field.key,
+            links: field.batchConfig.link
+          });
+        }
       }
 
       return dirtyCheck;
+    }
+
+    function processLinks() {
+      let model = this.model;
+      this.links.forEach((link) => {
+        let fieldHandler = function(val, prev) {
+          if (!angular.equals(val, prev)) {
+            if(val) {
+              link.links.forEach(key => {
+                cnFlexFormService.parseExpression(`__dirtyCheck["${key}"]`, model).set(true);
+              });
+            }
+          }
+        };
+        let fieldRegister = this.fieldRegister[link.key];
+        fieldRegister.field.watch.push({
+          resolution: fieldHandler
+        });
+        fieldRegister.dirtyCheck.watch = [{resolution: fieldHandler}];
+
+        let linkRegisters = _.filter(this.fieldRegister, (val, key) => link.links.includes(key));
+        linkRegisters.forEach((linkRegister) => {
+          if (!linkRegister.dirtyCheck.watch) linkRegister.dirtyCheck.watch = [];
+          linkRegister.dirtyCheck.watch.push({
+            resolution: (val, prev) => {
+              if (!angular.equals(val, prev)) {
+                if(val === false) {
+                  cnFlexFormService.parseExpression(`__dirtyCheck["${link.key}"]`, model).set(false);
+                }
+              }
+            }
+          });
+        });
+      });
     }
 
     function addToSchema(key, schema) {
