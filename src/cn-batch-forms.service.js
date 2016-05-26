@@ -62,6 +62,7 @@
         createBatchField,
         getChangedModels,
         getEditModeLegends,
+        getFormFromRegister,
         getModelValues,
         getSchemaDefault,
         getTitleMap,
@@ -75,6 +76,7 @@
         processNumber,
         processSelect,
         processToggle,
+        setValidation,
         setValue,
         showResults
       }).constructor(schema, model, models);
@@ -122,9 +124,10 @@
     }
 
     function onFieldScope(event, scope) {
-      let key = scope.form._key;
+      let key = cnFlexFormService.getKey(scope.form.key);
       //console.log('onFieldScope:', key, scope.form.key, scope);
-      if(key) {
+      if(!key.startsWith('__')) {
+        if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
         this.fieldRegister[key].ngModel = scope.ngModel;
         this.fieldRegister[key].scope = scope;
       }
@@ -283,6 +286,41 @@
       return batchField;
     }
 
+    function setValidation(field, val) {
+      let key = cnFlexFormService.getKey(field.key);
+
+      let forms = key ? this.getFormFromRegister(key) : [];
+
+      forms.forEach(form => {
+        if(form.scope) {
+          form.scope.options = {
+            tv4Validation: val
+          };
+          Object.keys(form.ngModel.$error)
+              .filter(function(k) {
+                return k.indexOf('tv4-') === 0;
+              })
+              .forEach(function(k) {
+                form.ngModel.$setValidity(k, true);
+              });
+        }
+      });
+      if (field.items) {
+        field.items.forEach(i => this.setValidation(i, val));
+      }
+    }
+
+    function getFormFromRegister(key) {
+      if (key.includes('[]')) {
+        let re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
+        return _.filter(this.fieldRegister, (form, k) => {
+          return re.test(k);
+        });
+      } else {
+        return [this.fieldRegister[key]];
+      }
+    }
+
     function createDirtyCheck(field) {
       //let path = sfPath.parse(field.key);
       let key = `__dirtyCheck["${field.key || batchConfig.key}"]`;
@@ -298,18 +336,10 @@
         type: 'cn-dirty-check',
         watch: [{
           resolution: (val) => {
-            $timeout(() => {
-              let form = this.fieldRegister[field.key];
-              if(form.scope) {
-                form.scope.options = {
-                  tv4Validation: val
-                };
-                Object.keys(form.ngModel.$error)
-                    .filter(function(k) { return k.indexOf('tv4-') === 0; })
-                    .forEach(function(k) { ngModel.$setValidity(k, true); });
-                $rootScope.$broadcast('schemaFormValidate');
-              }
-            });
+            //$timeout(() => {
+              this.setValidation(field, val);
+              $rootScope.$broadcast('schemaFormValidate');
+            //});
           }
         }]
       };
