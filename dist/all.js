@@ -398,16 +398,20 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         type: 'cn-dirty-check',
         watch: [{
           resolution: function resolution(val) {
-            var form = _this2.fieldRegister[field.key];
-            form.scope.options = {
-              tv4Validation: val
-            };
-            Object.keys(form.ngModel.$error).filter(function (k) {
-              return k.indexOf('tv4-') === 0;
-            }).forEach(function (k) {
-              ngModel.$setValidity(k, true);
+            $timeout(function () {
+              var form = _this2.fieldRegister[field.key];
+              if (form.scope) {
+                form.scope.options = {
+                  tv4Validation: val
+                };
+                Object.keys(form.ngModel.$error).filter(function (k) {
+                  return k.indexOf('tv4-') === 0;
+                }).forEach(function (k) {
+                  ngModel.$setValidity(k, true);
+                });
+                $rootScope.$broadcast('schemaFormValidate');
+              }
             });
-            $rootScope.$broadcast('schemaFormValidate');
           }
         }]
       };

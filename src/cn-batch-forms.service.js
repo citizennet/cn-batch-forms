@@ -298,14 +298,18 @@
         type: 'cn-dirty-check',
         watch: [{
           resolution: (val) => {
-            let form = this.fieldRegister[field.key];
-            form.scope.options = {
-              tv4Validation: val
-            };
-            Object.keys(form.ngModel.$error)
-                .filter(function(k) { return k.indexOf('tv4-') === 0; })
-                .forEach(function(k) { ngModel.$setValidity(k, true); });
-            $rootScope.$broadcast('schemaFormValidate');
+            $timeout(() => {
+              let form = this.fieldRegister[field.key];
+              if(form.scope) {
+                form.scope.options = {
+                  tv4Validation: val
+                };
+                Object.keys(form.ngModel.$error)
+                    .filter(function(k) { return k.indexOf('tv4-') === 0; })
+                    .forEach(function(k) { ngModel.$setValidity(k, true); });
+                $rootScope.$broadcast('schemaFormValidate');
+              }
+            });
           }
         }]
       };
