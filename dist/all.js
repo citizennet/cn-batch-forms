@@ -109,7 +109,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 })();
 'use strict';
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
@@ -384,9 +384,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function createDirtyCheck(field) {
       var _this2 = this;
 
-      var path = sfPath.parse(field.key);
-      var key = '__dirtyCheck["' + path[0] + '"]';
-      var child = path.length > 1;
+      //let path = sfPath.parse(field.key);
+      var key = '__dirtyCheck["' + (field.key || batchConfig.key) + '"]';
+      //let child = path.length > 1;
       var htmlClass = '';
 
       //if(child) htmlClass += ' semi-transparent';
@@ -417,44 +417,42 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         notitle: true
       });
 
-      if (!child) {
-        (function () {
-          if (field.watch) {
-            if (!_.isArray(field.watch)) field.watch = [field.watch];
-          } else {
-            field.watch = [];
-          }
+      //if(!child) {
+      if (field.watch) {
+        if (!_.isArray(field.watch)) field.watch = [field.watch];
+      } else {
+        field.watch = [];
+      }
 
-          var model = _this2.buildModelDefault(field.key, field.schema) || {};
+      var model = this.buildModelDefault(field.key, field.schema) || {};
 
-          field.watch.push({
-            resolution: function resolution(val, prev) {
-              if (!angular.equals(val, prev) && !angular.equals(val, model[field.key])) {
-                var register = _this2.fieldRegister[field.key];
-                if (register) {
-                  if (register.ngModel && register.ngModel.$dirty || register.initiated) {
-                    //console.log('dirtyCheck.key:', dirtyCheck.key);
-                    cnFlexFormService.parseExpression(dirtyCheck.key, _this2.model).set(true);
-                  } else {
-                    register.initiated = true;
-                  }
-                }
-                // debug
-                else {
-                    console.log('noregister:', register);
-                  }
+      field.watch.push({
+        resolution: function resolution(val, prev) {
+          if (!angular.equals(val, prev) && !angular.equals(val, model[field._key])) {
+            var register = _this2.fieldRegister[field._key];
+            if (register) {
+              if (register.ngModel && register.ngModel.$dirty || register.initiated) {
+                console.log('dirtyCheck.key:', key);
+                cnFlexFormService.parseExpression(key, _this2.model).set(true);
+              } else {
+                register.initiated = true;
               }
             }
-          });
-
-          if (field.batchConfig.link) {
-            _this2.links.push({
-              key: field.key,
-              links: field.batchConfig.link
-            });
+            // debug
+            else {
+                console.log('noregister:', field, _this2.fieldRegister);
+              }
           }
-        })();
+        }
+      });
+
+      if (field.batchConfig.link) {
+        this.links.push({
+          key: field.key,
+          links: field.batchConfig.link
+        });
       }
+      //}
 
       return dirtyCheck;
     }
@@ -499,7 +497,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
     function buildModelDefault(key, schema) {
       if (schema.type === 'array') {
-        var _ret2 = function () {
+        var _ret = (function () {
           var model = _defineProperty({}, key, []);
           if (schema.items) {
             _.each(schema.items.properties, function (v, k) {
@@ -511,9 +509,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           return {
             v: model
           };
-        }();
+        })();
 
-        if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
+        if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
       }
     }
 
@@ -591,11 +589,11 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           update.set(originalVal + ' ' + val.trim());
         }
       } else if (mode === 'prepend') {
-        var _originalVal = original.get();
-        if (_.isArray(_originalVal)) {
-          update.set(val.concat(_originalVal));
-        } else if (_.isString(_originalVal)) {
-          update.set(val.trim() + ' ' + _originalVal);
+        var originalVal = original.get();
+        if (_.isArray(originalVal)) {
+          update.set(val.concat(originalVal));
+        } else if (_.isString(originalVal)) {
+          update.set(val.trim() + ' ' + originalVal);
         }
       } else if (mode === 'increase') {
         update.set(original.get() + val);

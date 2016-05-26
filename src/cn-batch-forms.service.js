@@ -284,9 +284,9 @@
     }
 
     function createDirtyCheck(field) {
-      let path = sfPath.parse(field.key);
-      let key = `__dirtyCheck["${path[0]}"]`;
-      let child = path.length > 1;
+      //let path = sfPath.parse(field.key);
+      let key = `__dirtyCheck["${field.key || batchConfig.key}"]`;
+      //let child = path.length > 1;
       let htmlClass = '';
 
       //if(child) htmlClass += ' semi-transparent';
@@ -315,7 +315,7 @@
         notitle: true
       });
 
-      if(!child) {
+      //if(!child) {
         if(field.watch) {
           if(!_.isArray(field.watch)) field.watch = [field.watch];
         }
@@ -327,12 +327,12 @@
 
         field.watch.push({
           resolution: (val, prev) => {
-            if(!angular.equals(val, prev) && !angular.equals(val, model[field.key])) {
-              let register = this.fieldRegister[field.key];
+            if(!angular.equals(val, prev) && !angular.equals(val, model[field._key])) {
+              let register = this.fieldRegister[field._key];
               if(register) {
                 if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
-                  //console.log('dirtyCheck.key:', dirtyCheck.key);
-                  cnFlexFormService.parseExpression(dirtyCheck.key, this.model).set(true);
+                  console.log('dirtyCheck.key:', key);
+                  cnFlexFormService.parseExpression(key, this.model).set(true);
                 }
                 else {
                   register.initiated = true;
@@ -340,7 +340,7 @@
               }
               // debug
               else {
-                console.log('noregister:', register);
+                console.log('noregister:', field, this.fieldRegister);
               }
             }
           }
@@ -352,7 +352,7 @@
             links: field.batchConfig.link
           });
         }
-      }
+      //}
 
       return dirtyCheck;
     }
