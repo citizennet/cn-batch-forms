@@ -390,6 +390,11 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
       var key = cnFlexFormService.getKey(field.key);
 
+      if (field.schema && field.schema.type === 'array') {
+        if (_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
+        field.schema.minItems = val ? field.schema._minItems : 0;
+      }
+
       var forms = key ? this.getFormFromRegister(key) : [];
 
       forms.forEach(function (form) {

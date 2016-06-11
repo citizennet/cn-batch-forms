@@ -288,6 +288,11 @@
     function setValidation(field, val) {
       let key = cnFlexFormService.getKey(field.key);
 
+      if (field.schema && field.schema.type === 'array') {
+        if (_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
+        field.schema.minItems = val ? field.schema._minItems : 0;
+      }
+
       let forms = key ? this.getFormFromRegister(key) : [];
 
       forms.forEach(form => {
