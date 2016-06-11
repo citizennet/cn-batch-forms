@@ -8,7 +8,6 @@
     'cnFlexFormTypes',
     'sfPath',
     '$rootScope',
-    '$state',
     '$timeout',
     'cnModal'
   ];
@@ -17,7 +16,6 @@
       cnFlexFormTypes,
       sfPath,
       $rootScope,
-      $state,
       $timeout,
       cnModal) {
 
@@ -58,7 +56,6 @@
         clearSchemaDefault,
         closeModal,
         createDirtyCheck,
-        processLinks,
         createBatchField,
         getChangedModels,
         getEditModeLegends,
@@ -66,6 +63,7 @@
         getModelValues,
         getSchemaDefault,
         getTitleMap,
+        handleLinks,
         onFieldScope,
         processCondition,
         processForm,
@@ -73,6 +71,8 @@
         processItems,
         processDate,
         processDefault,
+        processLinkList,
+        processLinks,
         processNumber,
         processSelect,
         processToggle,
@@ -94,7 +94,6 @@
       this.models = models;
       this.editModes = {};
       this.fieldRegister = {};
-      this.links = [];
 
       this.clearDefaults();
 
@@ -349,80 +348,80 @@
         notitle: true
       });
 
-      //if(!child) {
-        if(field.watch) {
-          if(!_.isArray(field.watch)) field.watch = [field.watch];
-        }
-        else {
-          field.watch = [];
-        }
+      if(field.watch) {
+        if(!_.isArray(field.watch)) field.watch = [field.watch];
+      }
+      else {
+        field.watch = [];
+      }
 
-        let model = this.buildModelDefault(field.key, field.schema) || {};
+      let model = this.buildModelDefault(field.key, field.schema) || {};
 
-        field.watch.push({
-          resolution: (val, prev) => {
-            if(!angular.equals(val, prev) && !angular.equals(val, model[field._key])) {
-              let register = this.fieldRegister[field._key];
-              if(register) {
-                if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
-                  console.log('dirtyCheck.key:', key);
-                  cnFlexFormService.parseExpression(key, this.model).set(true);
-                }
-                else {
-                  register.initiated = true;
-                }
+      field.watch.push({
+        resolution: val => {
+          if(!angular.equals(val, model[field._key])) {
+            let register = this.fieldRegister[field._key];
+            if(register) {
+              if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
+                //console.log('dirtyCheck.key:', key);
+                cnFlexFormService.parseExpression(key, this.model).set(true);
               }
-              // debug
               else {
-                console.log('noregister:', field, this.fieldRegister);
+                register.initiated = true;
               }
             }
+            // debug
+            else {
+              console.log('noregister:', field, this.fieldRegister);
+            }
           }
-        });
-
-        if (field.batchConfig.link) {
-          this.links.push({
-            key: field.key,
-            links: field.batchConfig.link
-          });
         }
-      //}
+      });
 
       return dirtyCheck;
     }
 
-    function processLinks() {
-      let model = this.model;
-      this.links.forEach((link) => {
-        let fieldHandler = function(val, prev) {
-          if (!angular.equals(val, prev)) {
-            if(val) {
-              link.links.forEach(key => {
-                cnFlexFormService.parseExpression(`__dirtyCheck["${key}"]`, model).set(true);
-              });
-            }
+    function handleLinks(list, hard) {
+      return val => {
+        //console.log('val:', list);
+        list.forEach(key => {
+          if(!hard) {
+            let register = this.fieldRegister[key];
+            if(!register.ngModel || !register.ngModel.$dirty) return;
           }
-        };
-        let fieldRegister = this.fieldRegister[link.key];
-        fieldRegister.field.watch.push({
-          resolution: fieldHandler
+          cnFlexFormService.parseExpression(`__dirtyCheck["${key}"]`, this.model).set(val);
         });
-        fieldRegister.dirtyCheck.watch = [{resolution: fieldHandler}];
+      };
+    }
 
-        let linkRegisters = _.filter(this.fieldRegister, (val, key) => link.links.includes(key));
-        linkRegisters.forEach((linkRegister) => {
-          if (!linkRegister.dirtyCheck.watch) linkRegister.dirtyCheck.watch = [];
-          linkRegister.dirtyCheck.watch.push({
-            resolution: (val, prev) => {
-              if (!angular.equals(val, prev)) {
-                if(val === false) {
-                  cnFlexFormService.parseExpression(`__dirtyCheck["${link.key}"]`, model).set(false);
-                }
-              }
-            }
-          });
+    function processLinkList(list, hard) {
+      list.forEach(keys => {
+        keys.forEach(key => {
+          let register = this.fieldRegister[key];
+          if(!register) {
+            console.error('noRegister:', key);
+            return;
+          }
+          let {field, dirtyCheck} = register;
+          let handler = this.handleLinks(_.without(keys, key), hard);
+          field.watch = field.watch || [];
+          dirtyCheck.watch = dirtyCheck.watch || [];
+          field.watch.push({resolution() {handler(true)}});
+          dirtyCheck.watch.push({resolution: handler});
         });
       });
+    }
+
+    function processLinks() {
+      console.log('this.schema.batchConfig:', this.schema.batchConfig);
+      if(this.schema.batchConfig) {
+        if(this.schema.batchConfig.links) {
+          this.processLinkList(this.schema.batchConfig.links);
+        }
+        if(this.schema.batchConfig.hardLinks) {
+          this.processLinkList(this.schema.batchConfig.hardLinks, true);
+        }
+      }
     }
 
     function buildModelDefault(key, schema) {
@@ -493,20 +492,43 @@
             .get();
 
         this.models.forEach((model, i) => {
-          if(!models[i]) models[i] = {};
+          models[i] = models[i] || {};
 
-          let val = cnFlexFormService
-              .parseExpression(key, this.model)
-              .get();
-          let update = cnFlexFormService
-              .parseExpression(key, models[i]);
-          let original = cnFlexFormService
-              .parseExpression(key, this.models[i]);
+          let path = sfPath.parse(key);
+          // if column is json, we want to merge updates into model's current json value
+          // so we copy the current value if we haven't already (on a previous iteration)
+          if(path.length > 1 && !models[i][path[0]]) {
+            models[i][path[0]] = this.models[i][path[0]];
+          }
 
-          this.setValue(val, update, original, mode);
+          let assignable = cnFlexFormService
+              .parseExpression(key, this.models[i])
+              .getAssignable();
+
+          // if column is json and model's current value doesn't have parent property for
+          // key we're updating, just copy over entire key instead of using specific
+          // edit mode logic for new value
+          if(assignable.fullPath !== key) {
+            let val = cnFlexFormService
+                .parseExpression(assignable.fullPath, this.model)
+                .get();
+
+            cnFlexFormService
+                .parseExpression(assignable.fullPath, this.models[i])
+                .set(val);
+          }
+          else {
+            let val = cnFlexFormService.parseExpression(key, this.model).get();
+            let update = cnFlexFormService.parseExpression(key, models[i]);
+            let original = cnFlexFormService.parseExpression(key, this.models[i]);
+
+            //console.log('val, update, original:', val, update.get(), original.get(), key);
+            this.setValue(val, update, original, mode);
+          }
         });
       });
 
+      //console.log('models:', models);
       return models;
     }
 
@@ -522,6 +544,9 @@
         else if(_.isString(originalVal)) {
           update.set(`${originalVal} ${val.trim()}`);
         }
+        else {
+          update.set(val);
+        }
       }
       else if(mode === 'prepend') {
         let originalVal = original.get();
@@ -531,12 +556,15 @@
         else if(_.isString(originalVal)) {
           update.set(`${val.trim()} ${originalVal}`);
         }
+        else {
+          update.set(val);
+        }
       }
       else if(mode === 'increase') {
-        update.set(original.get() + val);
+        update.set(_.add(original.get() || 0, val));
       }
       else if(mode === 'decrease') {
-        update.set(original.get() - val);
+        update.set(_.subtract(original.get() || 0, val));
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might

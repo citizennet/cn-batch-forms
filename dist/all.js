@@ -109,15 +109,15 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 })();
 'use strict';
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
-
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
 
 (function () {
   angular.module('cn.batch-forms').factory('cnBatchForms', cnBatchForms);
 
-  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$state', '$timeout', 'cnModal'];
-  function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $state, $timeout, cnModal) {
+  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$timeout', 'cnModal'];
+  function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $timeout, cnModal) {
 
     var instances = 0;
 
@@ -156,7 +156,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         clearSchemaDefault: clearSchemaDefault,
         closeModal: closeModal,
         createDirtyCheck: createDirtyCheck,
-        processLinks: processLinks,
         createBatchField: createBatchField,
         getChangedModels: getChangedModels,
         getEditModeLegends: getEditModeLegends,
@@ -164,6 +163,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         getModelValues: getModelValues,
         getSchemaDefault: getSchemaDefault,
         getTitleMap: getTitleMap,
+        handleLinks: handleLinks,
         onFieldScope: onFieldScope,
         processCondition: processCondition,
         processForm: processForm,
@@ -171,6 +171,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         processItems: processItems,
         processDate: processDate,
         processDefault: processDefault,
+        processLinkList: processLinkList,
+        processLinks: processLinks,
         processNumber: processNumber,
         processSelect: processSelect,
         processToggle: processToggle,
@@ -192,7 +194,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       this.models = models;
       this.editModes = {};
       this.fieldRegister = {};
-      this.links = [];
 
       this.clearDefaults();
 
@@ -414,14 +415,14 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var _this3 = this;
 
       if (key.includes('[]')) {
-        var _ret = function () {
+        var _ret = (function () {
           var re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
           return {
             v: _.filter(_this3.fieldRegister, function (form, k) {
               return re.test(k);
             })
           };
-        }();
+        })();
 
         if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
       } else {
@@ -459,7 +460,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         notitle: true
       });
 
-      //if(!child) {
       if (field.watch) {
         if (!_.isArray(field.watch)) field.watch = [field.watch];
       } else {
@@ -469,12 +469,12 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var model = this.buildModelDefault(field.key, field.schema) || {};
 
       field.watch.push({
-        resolution: function resolution(val, prev) {
-          if (!angular.equals(val, prev) && !angular.equals(val, model[field._key])) {
+        resolution: function resolution(val) {
+          if (!angular.equals(val, model[field._key])) {
             var register = _this4.fieldRegister[field._key];
             if (register) {
               if (register.ngModel && register.ngModel.$dirty || register.initiated) {
-                console.log('dirtyCheck.key:', key);
+                //console.log('dirtyCheck.key:', key);
                 cnFlexFormService.parseExpression(key, _this4.model).set(true);
               } else {
                 register.initiated = true;
@@ -488,58 +488,65 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         }
       });
 
-      if (field.batchConfig.link) {
-        this.links.push({
-          key: field.key,
-          links: field.batchConfig.link
-        });
-      }
-      //}
-
       return dirtyCheck;
     }
 
-    function processLinks() {
+    function handleLinks(list, hard) {
       var _this5 = this;
 
-      var model = this.model;
-      this.links.forEach(function (link) {
-        var fieldHandler = function fieldHandler(val, prev) {
-          if (!angular.equals(val, prev)) {
-            if (val) {
-              link.links.forEach(function (key) {
-                cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', model).set(true);
-              });
-            }
+      return function (val) {
+        //console.log('val:', list);
+        list.forEach(function (key) {
+          if (!hard) {
+            var register = _this5.fieldRegister[key];
+            if (!register.ngModel || !register.ngModel.$dirty) return;
           }
-        };
-        var fieldRegister = _this5.fieldRegister[link.key];
-        fieldRegister.field.watch.push({
-          resolution: fieldHandler
+          cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this5.model).set(val);
         });
-        fieldRegister.dirtyCheck.watch = [{ resolution: fieldHandler }];
+      };
+    }
 
-        var linkRegisters = _.filter(_this5.fieldRegister, function (val, key) {
-          return link.links.includes(key);
-        });
-        linkRegisters.forEach(function (linkRegister) {
-          if (!linkRegister.dirtyCheck.watch) linkRegister.dirtyCheck.watch = [];
-          linkRegister.dirtyCheck.watch.push({
-            resolution: function resolution(val, prev) {
-              if (!angular.equals(val, prev)) {
-                if (val === false) {
-                  cnFlexFormService.parseExpression('__dirtyCheck["' + link.key + '"]', model).set(false);
-                }
-              }
+    function processLinkList(list, hard) {
+      var _this6 = this;
+
+      list.forEach(function (keys) {
+        keys.forEach(function (key) {
+          var register = _this6.fieldRegister[key];
+          if (!register) {
+            console.error('noRegister:', key);
+            return;
+          }
+          var field = register.field;
+          var dirtyCheck = register.dirtyCheck;
+
+          var handler = _this6.handleLinks(_.without(keys, key), hard);
+          field.watch = field.watch || [];
+          dirtyCheck.watch = dirtyCheck.watch || [];
+          field.watch.push({
+            resolution: function resolution() {
+              handler(true);
             }
           });
+          dirtyCheck.watch.push({ resolution: handler });
         });
       });
     }
 
+    function processLinks() {
+      console.log('this.schema.batchConfig:', this.schema.batchConfig);
+      if (this.schema.batchConfig) {
+        if (this.schema.batchConfig.links) {
+          this.processLinkList(this.schema.batchConfig.links);
+        }
+        if (this.schema.batchConfig.hardLinks) {
+          this.processLinkList(this.schema.batchConfig.hardLinks, true);
+        }
+      }
+    }
+
     function buildModelDefault(key, schema) {
       if (schema.type === 'array') {
-        var _ret2 = function () {
+        var _ret2 = (function () {
           var model = _defineProperty({}, key, []);
           if (schema.items) {
             _.each(schema.items.properties, function (v, k) {
@@ -551,7 +558,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           return {
             v: model
           };
-        }();
+        })();
 
         if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
       }
@@ -595,28 +602,48 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function getChangedModels() {
-      var _this6 = this;
+      var _this7 = this;
 
       var models = [];
 
       _.each(this.fieldRegister, function (register, key) {
-        var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this6.model).get();
+        var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this7.model).get();
 
         if (!dirty) return;
 
-        var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this6.model).get();
+        var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this7.model).get();
 
-        _this6.models.forEach(function (model, i) {
-          if (!models[i]) models[i] = {};
+        _this7.models.forEach(function (model, i) {
+          models[i] = models[i] || {};
 
-          var val = cnFlexFormService.parseExpression(key, _this6.model).get();
-          var update = cnFlexFormService.parseExpression(key, models[i]);
-          var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
+          var path = sfPath.parse(key);
+          // if column is json, we want to merge updates into model's current json value
+          // so we copy the current value if we haven't already (on a previous iteration)
+          if (path.length > 1 && !models[i][path[0]]) {
+            models[i][path[0]] = _this7.models[i][path[0]];
+          }
 
-          _this6.setValue(val, update, original, mode);
+          var assignable = cnFlexFormService.parseExpression(key, _this7.models[i]).getAssignable();
+
+          // if column is json and model's current value doesn't have parent property for
+          // key we're updating, just copy over entire key instead of using specific
+          // edit mode logic for new value
+          if (assignable.fullPath !== key) {
+            var val = cnFlexFormService.parseExpression(assignable.fullPath, _this7.model).get();
+
+            cnFlexFormService.parseExpression(assignable.fullPath, _this7.models[i]).set(val);
+          } else {
+            var val = cnFlexFormService.parseExpression(key, _this7.model).get();
+            var update = cnFlexFormService.parseExpression(key, models[i]);
+            var original = cnFlexFormService.parseExpression(key, _this7.models[i]);
+
+            //console.log('val, update, original:', val, update.get(), original.get(), key);
+            _this7.setValue(val, update, original, mode);
+          }
         });
       });
 
+      //console.log('models:', models);
       return models;
     }
 
@@ -629,18 +656,22 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           update.set(originalVal.concat(val));
         } else if (_.isString(originalVal)) {
           update.set(originalVal + ' ' + val.trim());
+        } else {
+          update.set(val);
         }
       } else if (mode === 'prepend') {
-        var _originalVal = original.get();
-        if (_.isArray(_originalVal)) {
-          update.set(val.concat(_originalVal));
-        } else if (_.isString(_originalVal)) {
-          update.set(val.trim() + ' ' + _originalVal);
+        var originalVal = original.get();
+        if (_.isArray(originalVal)) {
+          update.set(val.concat(originalVal));
+        } else if (_.isString(originalVal)) {
+          update.set(val.trim() + ' ' + originalVal);
+        } else {
+          update.set(val);
         }
       } else if (mode === 'increase') {
-        update.set(original.get() + val);
+        update.set(_.add(original.get() || 0, val));
       } else if (mode === 'decrease') {
-        update.set(original.get() - val);
+        update.set(_.subtract(original.get() || 0, val));
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
@@ -656,7 +687,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function processDefault(field) {
-      var _this7 = this;
+      var _this8 = this;
 
       var config = field.batchConfig;
 
@@ -667,7 +698,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       config.onSelect = {
         replace: function replace() {
           if (_.allEqual(config.ogValues)) {
-            cnFlexFormService.parseExpression(field.key, _this7.model).set(_.first(config.ogValues));
+            cnFlexFormService.parseExpression(field.key, _this8.model).set(_.first(config.ogValues));
           } else {
             field.placeholder = '—';
           }
@@ -702,7 +733,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function processSelect(field) {
-      var _this8 = this;
+      var _this9 = this;
 
       var type = field.schema.type;
       var config = field.batchConfig;
@@ -721,17 +752,17 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         config.onSelect = {
           replace: function replace(prev) {
             if (prev && prev !== 'append') {
-              cnFlexFormService.parseExpression(field.key, _this8.model).set([]);
+              cnFlexFormService.parseExpression(field.key, _this9.model).set([]);
             }
           },
           append: function append(prev) {
             if (prev !== 'replace') {
-              cnFlexFormService.parseExpression(field.key, _this8.model).set([]);
+              cnFlexFormService.parseExpression(field.key, _this9.model).set([]);
             }
           },
           remove: function remove() {
             var val = _.chain(field.batchConfig.ogValues).flatten().uniq().value();
-            cnFlexFormService.parseExpression(field.key, _this8.model).set(val);
+            cnFlexFormService.parseExpression(field.key, _this9.model).set(val);
           }
         };
       } else {
@@ -792,7 +823,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function showResults(results, config) {
-      var _this9 = this;
+      var _this10 = this;
 
       this.results = results;
       this.resultsConfig = config;
@@ -807,7 +838,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         templateUrl: 'cn-batch-forms/batch-results.html',
         resolve: {
           parent: function parent() {
-            return _this9;
+            return _this10;
           }
         }
       });
