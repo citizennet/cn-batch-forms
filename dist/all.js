@@ -111,11 +111,13 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
+function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
+
 (function () {
   angular.module('cn.batch-forms').factory('cnBatchForms', cnBatchForms);
 
-  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$state', '$timeout', 'cnModal'];
-  function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $state, $timeout, cnModal) {
+  cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$timeout', 'cnModal'];
+  function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $timeout, cnModal) {
 
     var instances = 0;
 
@@ -123,6 +125,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       'string': processDefault,
       'number': processNumber,
       'url': 'processDefault',
+      'array': processSelect,
       'cn-autocomplete': processSelect,
       'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
@@ -148,17 +151,19 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         constructor: constructor,
         addMeta: addMeta,
         addToSchema: addToSchema,
+        buildModelDefault: buildModelDefault,
         clearDefaults: clearDefaults,
         clearSchemaDefault: clearSchemaDefault,
         closeModal: closeModal,
         createDirtyCheck: createDirtyCheck,
-        processLinks: processLinks,
         createBatchField: createBatchField,
         getChangedModels: getChangedModels,
         getEditModeLegends: getEditModeLegends,
+        getFormFromRegister: getFormFromRegister,
         getModelValues: getModelValues,
         getSchemaDefault: getSchemaDefault,
         getTitleMap: getTitleMap,
+        handleLinks: handleLinks,
         onFieldScope: onFieldScope,
         processCondition: processCondition,
         processForm: processForm,
@@ -166,9 +171,12 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         processItems: processItems,
         processDate: processDate,
         processDefault: processDefault,
+        processLinkList: processLinkList,
+        processLinks: processLinks,
         processNumber: processNumber,
         processSelect: processSelect,
         processToggle: processToggle,
+        setValidation: setValidation,
         setValue: setValue,
         showResults: showResults
       }).constructor(schema, model, models);
@@ -186,7 +194,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       this.models = models;
       this.editModes = {};
       this.fieldRegister = {};
-      this.links = [];
 
       this.clearDefaults();
 
@@ -215,10 +222,12 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function onFieldScope(event, scope) {
-      var key = scope.form._key;
+      var key = cnFlexFormService.getKey(scope.form.key);
       //console.log('onFieldScope:', key, scope.form.key, scope);
-      if (key) {
+      if (!key.startsWith('__')) {
+        if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
         this.fieldRegister[key].ngModel = scope.ngModel;
+        this.fieldRegister[key].scope = scope;
       }
       // prevent edit mode radiobuttons from setting form to dirty
       else if (scope.form.key[0] === '__batchConfig') {
@@ -376,12 +385,62 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       return batchField;
     }
 
-    function createDirtyCheck(field) {
+    function setValidation(field, val) {
       var _this2 = this;
 
-      var path = sfPath.parse(field.key);
-      var key = '__dirtyCheck["' + path[0] + '"]';
-      var child = path.length > 1;
+      var key = cnFlexFormService.getKey(field.key);
+
+      if (field.schema && field.schema.type === 'array') {
+        if (_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
+        field.schema.minItems = val ? field.schema._minItems : 0;
+      }
+
+      var forms = key ? this.getFormFromRegister(key) : [];
+
+      forms.forEach(function (form) {
+        if (form.scope) {
+          form.scope.options = {
+            tv4Validation: val
+          };
+          Object.keys(form.ngModel.$error).filter(function (k) {
+            return k.indexOf('tv4-') === 0;
+          }).forEach(function (k) {
+            form.ngModel.$setValidity(k, true);
+          });
+        }
+      });
+      if (field.items) {
+        field.items.forEach(function (i) {
+          return _this2.setValidation(i, val);
+        });
+      }
+    }
+
+    function getFormFromRegister(key) {
+      var _this3 = this;
+
+      if (key.includes('[]')) {
+        var _ret = (function () {
+          var re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
+          return {
+            v: _.filter(_this3.fieldRegister, function (form, k) {
+              return re.test(k);
+            })
+          };
+        })();
+
+        if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
+      } else {
+        return [this.fieldRegister[key]];
+      }
+    }
+
+    function createDirtyCheck(field) {
+      var _this4 = this;
+
+      //let path = sfPath.parse(field.key);
+      var key = '__dirtyCheck["' + (field.key || batchConfig.key) + '"]';
+      //let child = path.length > 1;
       var htmlClass = '';
 
       //if(child) htmlClass += ' semi-transparent';
@@ -390,7 +449,15 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var dirtyCheck = {
         key: key,
         htmlClass: htmlClass,
-        type: 'cn-dirty-check'
+        type: 'cn-dirty-check',
+        watch: [{
+          resolution: function resolution(val) {
+            //$timeout(() => {
+            _this4.setValidation(field, val);
+            $rootScope.$broadcast('schemaFormValidate');
+            //});
+          }
+        }]
       };
 
       this.addToSchema(key, {
@@ -398,80 +465,108 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         notitle: true
       });
 
-      if (!child) {
-        if (field.watch) {
-          if (!_.isArray(field.watch)) field.watch = [field.watch];
-        } else {
-          field.watch = [];
-        }
-
-        field.watch.push({
-          resolution: function resolution(val, prev) {
-            if (!angular.equals(val, prev)) {
-              var register = _this2.fieldRegister[field.key];
-              if (register) {
-                if (register.ngModel && register.ngModel.$dirty || register.initiated) {
-                  //console.log('dirtyCheck.key:', dirtyCheck.key);
-                  cnFlexFormService.parseExpression(dirtyCheck.key, _this2.model).set(true);
-                } else {
-                  register.initiated = true;
-                }
-              }
-              // debug
-              else {
-                  console.log('noregister:', register);
-                }
-            }
-          }
-        });
-
-        if (field.batchConfig.link) {
-          this.links.push({
-            key: field.key,
-            links: field.batchConfig.link
-          });
-        }
+      if (field.watch) {
+        if (!_.isArray(field.watch)) field.watch = [field.watch];
+      } else {
+        field.watch = [];
       }
+
+      var model = this.buildModelDefault(field.key, field.schema) || {};
+
+      field.watch.push({
+        resolution: function resolution(val) {
+          if (!angular.equals(val, model[field._key])) {
+            var register = _this4.fieldRegister[field._key];
+            if (register) {
+              if (register.ngModel && register.ngModel.$dirty || register.initiated) {
+                //console.log('dirtyCheck.key:', key);
+                cnFlexFormService.parseExpression(key, _this4.model).set(true);
+              } else {
+                register.initiated = true;
+              }
+            }
+            // debug
+            else {
+                console.log('noregister:', field, _this4.fieldRegister);
+              }
+          }
+        }
+      });
 
       return dirtyCheck;
     }
 
-    function processLinks() {
-      var _this3 = this;
+    function handleLinks(list, hard) {
+      var _this5 = this;
 
-      var model = this.model;
-      this.links.forEach(function (link) {
-        var fieldHandler = function fieldHandler(val, prev) {
-          if (!angular.equals(val, prev)) {
-            if (val) {
-              link.links.forEach(function (key) {
-                cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', model).set(true);
-              });
-            }
+      return function (val) {
+        //console.log('val:', list);
+        list.forEach(function (key) {
+          if (!hard) {
+            var register = _this5.fieldRegister[key];
+            if (!register.ngModel || !register.ngModel.$dirty) return;
           }
-        };
-        var fieldRegister = _this3.fieldRegister[link.key];
-        fieldRegister.field.watch.push({
-          resolution: fieldHandler
+          cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this5.model).set(val);
         });
-        fieldRegister.dirtyCheck.watch = [{ resolution: fieldHandler }];
+      };
+    }
 
-        var linkRegisters = _.filter(_this3.fieldRegister, function (val, key) {
-          return link.links.includes(key);
-        });
-        linkRegisters.forEach(function (linkRegister) {
-          if (!linkRegister.dirtyCheck.watch) linkRegister.dirtyCheck.watch = [];
-          linkRegister.dirtyCheck.watch.push({
-            resolution: function resolution(val, prev) {
-              if (!angular.equals(val, prev)) {
-                if (val === false) {
-                  cnFlexFormService.parseExpression('__dirtyCheck["' + link.key + '"]', model).set(false);
-                }
-              }
+    function processLinkList(list, hard) {
+      var _this6 = this;
+
+      list.forEach(function (keys) {
+        keys.forEach(function (key) {
+          var register = _this6.fieldRegister[key];
+          if (!register) {
+            console.error('noRegister:', key);
+            return;
+          }
+          var field = register.field;
+          var dirtyCheck = register.dirtyCheck;
+
+          var handler = _this6.handleLinks(_.without(keys, key), hard);
+          field.watch = field.watch || [];
+          dirtyCheck.watch = dirtyCheck.watch || [];
+          field.watch.push({
+            resolution: function resolution() {
+              handler(true);
             }
           });
+          dirtyCheck.watch.push({ resolution: handler });
         });
       });
+    }
+
+    function processLinks() {
+      console.log('this.schema.batchConfig:', this.schema.batchConfig);
+      if (this.schema.batchConfig) {
+        if (this.schema.batchConfig.links) {
+          this.processLinkList(this.schema.batchConfig.links);
+        }
+        if (this.schema.batchConfig.hardLinks) {
+          this.processLinkList(this.schema.batchConfig.hardLinks, true);
+        }
+      }
+    }
+
+    function buildModelDefault(key, schema) {
+      if (schema.type === 'array') {
+        var _ret2 = (function () {
+          var model = _defineProperty({}, key, []);
+          if (schema.items) {
+            _.each(schema.items.properties, function (v, k) {
+              if (v.type === 'array') {
+                model[key].push(buildModelDefault(k, v));
+              }
+            });
+          }
+          return {
+            v: model
+          };
+        })();
+
+        if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
+      }
     }
 
     function addToSchema(key, schema) {
@@ -512,28 +607,48 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function getChangedModels() {
-      var _this4 = this;
+      var _this7 = this;
 
       var models = [];
 
       _.each(this.fieldRegister, function (register, key) {
-        var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this4.model).get();
+        var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this7.model).get();
 
         if (!dirty) return;
 
-        var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this4.model).get();
+        var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this7.model).get();
 
-        _this4.models.forEach(function (model, i) {
-          if (!models[i]) models[i] = {};
+        _this7.models.forEach(function (model, i) {
+          models[i] = models[i] || {};
 
-          var val = cnFlexFormService.parseExpression(key, _this4.model).get();
-          var update = cnFlexFormService.parseExpression(key, models[i]);
-          var original = cnFlexFormService.parseExpression(key, _this4.models[i]);
+          var path = sfPath.parse(key);
+          // if column is json, we want to merge updates into model's current json value
+          // so we copy the current value if we haven't already (on a previous iteration)
+          if (path.length > 1 && !models[i][path[0]]) {
+            models[i][path[0]] = _this7.models[i][path[0]];
+          }
 
-          _this4.setValue(val, update, original, mode);
+          var assignable = cnFlexFormService.parseExpression(key, _this7.models[i]).getAssignable();
+
+          // if column is json and model's current value doesn't have parent property for
+          // key we're updating, just copy over entire key instead of using specific
+          // edit mode logic for new value
+          if (assignable.fullPath !== key) {
+            var val = cnFlexFormService.parseExpression(assignable.fullPath, _this7.model).get();
+
+            cnFlexFormService.parseExpression(assignable.fullPath, _this7.models[i]).set(val);
+          } else {
+            var val = cnFlexFormService.parseExpression(key, _this7.model).get();
+            var update = cnFlexFormService.parseExpression(key, models[i]);
+            var original = cnFlexFormService.parseExpression(key, _this7.models[i]);
+
+            //console.log('val, update, original:', val, update.get(), original.get(), key);
+            _this7.setValue(val, update, original, mode);
+          }
         });
       });
 
+      //console.log('models:', models);
       return models;
     }
 
@@ -546,18 +661,22 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           update.set(originalVal.concat(val));
         } else if (_.isString(originalVal)) {
           update.set(originalVal + ' ' + val.trim());
+        } else {
+          update.set(val);
         }
       } else if (mode === 'prepend') {
-        var _originalVal = original.get();
-        if (_.isArray(_originalVal)) {
-          update.set(val.concat(_originalVal));
-        } else if (_.isString(_originalVal)) {
-          update.set(val.trim() + ' ' + _originalVal);
+        var originalVal = original.get();
+        if (_.isArray(originalVal)) {
+          update.set(val.concat(originalVal));
+        } else if (_.isString(originalVal)) {
+          update.set(val.trim() + ' ' + originalVal);
+        } else {
+          update.set(val);
         }
       } else if (mode === 'increase') {
-        update.set(original.get() + val);
+        update.set(_.add(original.get() || 0, val));
       } else if (mode === 'decrease') {
-        update.set(original.get() - val);
+        update.set(_.subtract(original.get() || 0, val));
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
@@ -573,6 +692,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function processDefault(field) {
+      var _this8 = this;
+
       var config = field.batchConfig;
 
       config.editModes = config.editModes || ['replace', 'prepend', 'append'];
@@ -582,7 +703,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       config.onSelect = {
         replace: function replace() {
           if (_.allEqual(config.ogValues)) {
-            field.placeholder = _.first(config.ogValues);
+            cnFlexFormService.parseExpression(field.key, _this8.model).set(_.first(config.ogValues));
           } else {
             field.placeholder = '—';
           }
@@ -602,14 +723,22 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       config.editModes = config.editModes || ['replace', 'decrease', 'increase'];
 
       if (_.allEqual(config.ogValues)) {
-        field.placeholder = _.first(config.ogValues);
+        cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
+      } else {
+        field.placeholder = '—';
+      }
+    }
+
+    function setNestedPlaceholder(field) {
+      if (field.items) {
+        field.items.forEach(setNestedPlaceholder);
       } else {
         field.placeholder = '—';
       }
     }
 
     function processSelect(field) {
-      var _this5 = this;
+      var _this9 = this;
 
       var type = field.schema.type;
       var config = field.batchConfig;
@@ -619,20 +748,26 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
         config.default = config.default || 'append';
 
+        if (_.allEqual(config.ogValues)) {
+          cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
+        } else {
+          setNestedPlaceholder(field);
+        }
+
         config.onSelect = {
           replace: function replace(prev) {
-            if (prev !== 'append') {
-              cnFlexFormService.parseExpression(field.key, _this5.model).set([]);
+            if (prev && prev !== 'append') {
+              cnFlexFormService.parseExpression(field.key, _this9.model).set([]);
             }
           },
           append: function append(prev) {
             if (prev !== 'replace') {
-              cnFlexFormService.parseExpression(field.key, _this5.model).set([]);
+              cnFlexFormService.parseExpression(field.key, _this9.model).set([]);
             }
           },
           remove: function remove() {
             var val = _.chain(field.batchConfig.ogValues).flatten().uniq().value();
-            cnFlexFormService.parseExpression(field.key, _this5.model).set(val);
+            cnFlexFormService.parseExpression(field.key, _this9.model).set(val);
           }
         };
       } else {
@@ -640,11 +775,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         var first = _.first(config.ogValues);
         //TODO: dynamically send back data
         if (first && _.allEqual(config.ogValues)) {
-          var titleMap = field.titleMap || field.titleMapResolve && this.schema.data[field.titleMapResolve];
-          if (titleMap /* && !_.isObject(first)*/) {
-              first = _.find(titleMap, _defineProperty({}, field.valueProperty || 'value', first));
-            }
-          field.placeholder = first && first[field.displayProperty || 'name'];
+          cnFlexFormService.parseExpression(field.key, this.model).set(first);
         }
 
         if (!field.placeholder) {
@@ -657,7 +788,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var config = field.batchConfig;
 
       if (_.allEqual(config.ogValues)) {
-        field.placeholder = moment(_.first(config.ogValues)).format('M/DD/YYYY h:mm a');
+        cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       } else {
         field.placeholder = '—';
       }
@@ -667,11 +798,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var config = field.batchConfig;
 
       if (_.allEqual(config.ogValues)) {
-        if (_.first(config.ogValues) == (field.onValue || true)) {
-          field.undefinedClass = 'semi-transparent';
-        } else {
-          field.undefinedClass = 'disabled semi-transparent';
-        }
+        cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       }
     }
 
@@ -701,7 +828,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function showResults(results, config) {
-      var _this6 = this;
+      var _this10 = this;
 
       this.results = results;
       this.resultsConfig = config;
@@ -716,7 +843,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         templateUrl: 'cn-batch-forms/batch-results.html',
         resolve: {
           parent: function parent() {
-            return _this6;
+            return _this10;
           }
         }
       });
