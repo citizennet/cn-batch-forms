@@ -8,7 +8,6 @@
     'cnFlexFormTypes',
     'sfPath',
     '$rootScope',
-    '$state',
     '$timeout',
     'cnModal'
   ];
@@ -17,7 +16,6 @@
       cnFlexFormTypes,
       sfPath,
       $rootScope,
-      $state,
       $timeout,
       cnModal) {
 
@@ -27,6 +25,7 @@
       'string': processDefault,
       'number': processNumber,
       'url': 'processDefault',
+      'array': processSelect,
       'cn-autocomplete': processSelect,
       'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
@@ -52,6 +51,7 @@
         constructor,
         addMeta,
         addToSchema,
+        buildModelDefault,
         clearDefaults,
         clearSchemaDefault,
         closeModal,
@@ -59,9 +59,11 @@
         createBatchField,
         getChangedModels,
         getEditModeLegends,
+        getFormFromRegister,
         getModelValues,
         getSchemaDefault,
         getTitleMap,
+        handleLinks,
         onFieldScope,
         processCondition,
         processForm,
@@ -69,9 +71,12 @@
         processItems,
         processDate,
         processDefault,
+        processLinkList,
+        processLinks,
         processNumber,
         processSelect,
         processToggle,
+        setValidation,
         setValue,
         showResults
       }).constructor(schema, model, models);
@@ -108,6 +113,7 @@
       }
 
       this.addMeta();
+      this.processLinks();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
 
@@ -117,10 +123,12 @@
     }
 
     function onFieldScope(event, scope) {
-      let key = scope.form._key;
+      let key = cnFlexFormService.getKey(scope.form.key);
       //console.log('onFieldScope:', key, scope.form.key, scope);
-      if(key) {
+      if(!key.startsWith('__')) {
+        if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
         this.fieldRegister[key].ngModel = scope.ngModel;
+        this.fieldRegister[key].scope = scope;
       }
       // prevent edit mode radiobuttons from setting form to dirty
       else if(scope.form.key[0] === '__batchConfig') {
@@ -153,7 +161,8 @@
           };
           delete child.condition;
           this.fieldRegister[child.key] = {
-            field: child
+            field: child,
+            dirtyCheck
           };
         }
         if(!show) {
@@ -276,10 +285,50 @@
       return batchField;
     }
 
+    function setValidation(field, val) {
+      let key = cnFlexFormService.getKey(field.key);
+
+      if (field.schema && field.schema.type === 'array') {
+        if (_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
+        field.schema.minItems = val ? field.schema._minItems : 0;
+      }
+
+      let forms = key ? this.getFormFromRegister(key) : [];
+
+      forms.forEach(form => {
+        if(form.scope) {
+          form.scope.options = {
+            tv4Validation: val
+          };
+          Object.keys(form.ngModel.$error)
+              .filter(function(k) {
+                return k.indexOf('tv4-') === 0;
+              })
+              .forEach(function(k) {
+                form.ngModel.$setValidity(k, true);
+              });
+        }
+      });
+      if (field.items) {
+        field.items.forEach(i => this.setValidation(i, val));
+      }
+    }
+
+    function getFormFromRegister(key) {
+      if (key.includes('[]')) {
+        let re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
+        return _.filter(this.fieldRegister, (form, k) => {
+          return re.test(k);
+        });
+      } else {
+        return [this.fieldRegister[key]];
+      }
+    }
+
     function createDirtyCheck(field) {
-      let path = sfPath.parse(field.key);
-      let key = `__dirtyCheck["${path[0]}"]`;
-      let child = path.length > 1;
+      //let path = sfPath.parse(field.key);
+      let key = `__dirtyCheck["${field.key || batchConfig.key}"]`;
+      //let child = path.length > 1;
       let htmlClass = '';
 
       //if(child) htmlClass += ' semi-transparent';
@@ -288,7 +337,15 @@
       let dirtyCheck = {
         key,
         htmlClass,
-        type: 'cn-dirty-check'
+        type: 'cn-dirty-check',
+        watch: [{
+          resolution: (val) => {
+            //$timeout(() => {
+              this.setValidation(field, val);
+              $rootScope.$broadcast('schemaFormValidate');
+            //});
+          }
+        }]
       };
 
       this.addToSchema(key, {
@@ -296,37 +353,94 @@
         notitle: true
       });
 
-      if(!child) {
-        if(field.watch) {
-          if(!_.isArray(field.watch)) field.watch = [field.watch];
-        }
-        else {
-          field.watch = [];
-        }
-
-        field.watch.push({
-          resolution: (val, prev) => {
-            if(!angular.equals(val, prev)) {
-              let register = this.fieldRegister[field.key];
-              if(register) {
-                if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
-                  //console.log('dirtyCheck.key:', dirtyCheck.key);
-                  cnFlexFormService.parseExpression(dirtyCheck.key, this.model).set(true);
-                }
-                else {
-                  register.initiated = true;
-                }
-              }
-              // debug
-              else {
-                console.log('noregister:', register);
-              }
-            }
-          }
-        });
+      if(field.watch) {
+        if(!_.isArray(field.watch)) field.watch = [field.watch];
+      }
+      else {
+        field.watch = [];
       }
 
+      let model = this.buildModelDefault(field.key, field.schema) || {};
+
+      field.watch.push({
+        resolution: val => {
+          if(!angular.equals(val, model[field._key])) {
+            let register = this.fieldRegister[field._key];
+            if(register) {
+              if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
+                //console.log('dirtyCheck.key:', key);
+                cnFlexFormService.parseExpression(key, this.model).set(true);
+              }
+              else {
+                register.initiated = true;
+              }
+            }
+            // debug
+            else {
+              console.log('noregister:', field, this.fieldRegister);
+            }
+          }
+        }
+      });
+
       return dirtyCheck;
+    }
+
+    function handleLinks(list, hard) {
+      return val => {
+        //console.log('val:', list);
+        list.forEach(key => {
+          if(!hard) {
+            let register = this.fieldRegister[key];
+            if(!register.ngModel || !register.ngModel.$dirty) return;
+          }
+          cnFlexFormService.parseExpression(`__dirtyCheck["${key}"]`, this.model).set(val);
+        });
+      };
+    }
+
+    function processLinkList(list, hard) {
+      list.forEach(keys => {
+        keys.forEach(key => {
+          let register = this.fieldRegister[key];
+          if(!register) {
+            console.error('noRegister:', key);
+            return;
+          }
+          let {field, dirtyCheck} = register;
+          let handler = this.handleLinks(_.without(keys, key), hard);
+          field.watch = field.watch || [];
+          dirtyCheck.watch = dirtyCheck.watch || [];
+          field.watch.push({resolution() {handler(true)}});
+          dirtyCheck.watch.push({resolution: handler});
+        });
+      });
+    }
+
+    function processLinks() {
+      console.log('this.schema.batchConfig:', this.schema.batchConfig);
+      if(this.schema.batchConfig) {
+        if(this.schema.batchConfig.links) {
+          this.processLinkList(this.schema.batchConfig.links);
+        }
+        if(this.schema.batchConfig.hardLinks) {
+          this.processLinkList(this.schema.batchConfig.hardLinks, true);
+        }
+      }
+    }
+
+    function buildModelDefault(key, schema) {
+      if (schema.type === 'array') {
+        let model = {[key]: []};
+        if (schema.items) {
+          _.each(schema.items.properties, (v, k) => {
+            if (v.type === 'array') {
+              model[key].push(buildModelDefault(k, v));
+            }
+          });
+        }
+        return model;
+      }
     }
 
     function addToSchema(key, schema) {
@@ -383,20 +497,43 @@
             .get();
 
         this.models.forEach((model, i) => {
-          if(!models[i]) models[i] = {};
+          models[i] = models[i] || {};
 
-          let val = cnFlexFormService
-              .parseExpression(key, this.model)
-              .get();
-          let update = cnFlexFormService
-              .parseExpression(key, models[i]);
-          let original = cnFlexFormService
-              .parseExpression(key, this.models[i]);
+          let path = sfPath.parse(key);
+          // if column is json, we want to merge updates into model's current json value
+          // so we copy the current value if we haven't already (on a previous iteration)
+          if(path.length > 1 && !models[i][path[0]]) {
+            models[i][path[0]] = this.models[i][path[0]];
+          }
 
-          this.setValue(val, update, original, mode);
+          let assignable = cnFlexFormService
+              .parseExpression(key, this.models[i])
+              .getAssignable();
+
+          // if column is json and model's current value doesn't have parent property for
+          // key we're updating, just copy over entire key instead of using specific
+          // edit mode logic for new value
+          if(assignable.fullPath !== key) {
+            let val = cnFlexFormService
+                .parseExpression(assignable.fullPath, this.model)
+                .get();
+
+            cnFlexFormService
+                .parseExpression(assignable.fullPath, this.models[i])
+                .set(val);
+          }
+          else {
+            let val = cnFlexFormService.parseExpression(key, this.model).get();
+            let update = cnFlexFormService.parseExpression(key, models[i]);
+            let original = cnFlexFormService.parseExpression(key, this.models[i]);
+
+            //console.log('val, update, original:', val, update.get(), original.get(), key);
+            this.setValue(val, update, original, mode);
+          }
         });
       });
 
+      //console.log('models:', models);
       return models;
     }
 
@@ -412,6 +549,9 @@
         else if(_.isString(originalVal)) {
           update.set(`${originalVal} ${val.trim()}`);
         }
+        else {
+          update.set(val);
+        }
       }
       else if(mode === 'prepend') {
         let originalVal = original.get();
@@ -421,12 +561,15 @@
         else if(_.isString(originalVal)) {
           update.set(`${val.trim()} ${originalVal}`);
         }
+        else {
+          update.set(val);
+        }
       }
       else if(mode === 'increase') {
-        update.set(original.get() + val);
+        update.set(_.add(original.get() || 0, val));
       }
       else if(mode === 'decrease') {
-        update.set(original.get() - val);
+        update.set(_.subtract(original.get() || 0, val));
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
@@ -451,7 +594,7 @@
       config.onSelect = {
         replace: () => {
           if(_.allEqual(config.ogValues)) {
-            field.placeholder = _.first(config.ogValues);
+            cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
           }
           else {
             field.placeholder = '—';
@@ -472,9 +615,17 @@
       config.editModes = config.editModes || ['replace', 'decrease', 'increase'];
 
       if(_.allEqual(config.ogValues)) {
-        field.placeholder = _.first(config.ogValues);
+        cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       }
       else {
+        field.placeholder = '—';
+      }
+    }
+
+    function setNestedPlaceholder(field) {
+      if (field.items) {
+        field.items.forEach(setNestedPlaceholder);
+      } else {
         field.placeholder = '—';
       }
     }
@@ -488,9 +639,15 @@
 
         config.default = config.default || 'append';
 
+        if (_.allEqual(config.ogValues)) {
+          cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
+        } else {
+          setNestedPlaceholder(field);
+        }
+
         config.onSelect = {
           replace: (prev) => {
-            if(prev !== 'append') {
+            if(prev && prev !== 'append') {
               cnFlexFormService.parseExpression(field.key, this.model).set([]);
             }
           },
@@ -510,11 +667,7 @@
         let first = _.first(config.ogValues);
         //TODO: dynamically send back data
         if(first && _.allEqual(config.ogValues)) {
-          let titleMap = field.titleMap || (field.titleMapResolve && this.schema.data[field.titleMapResolve]);
-          if(titleMap/* && !_.isObject(first)*/) {
-            first = _.find(titleMap, {[field.valueProperty || 'value']: first});
-          }
-          field.placeholder = first && first[field.displayProperty || 'name'];
+          cnFlexFormService.parseExpression(field.key, this.model).set(first);
         }
 
         if(!field.placeholder) {
@@ -527,7 +680,7 @@
       let config = field.batchConfig;
 
       if(_.allEqual(config.ogValues)) {
-        field.placeholder = moment(_.first(config.ogValues)).format('M/DD/YYYY h:mm a');
+        cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       }
       else {
         field.placeholder = '—';
@@ -538,12 +691,7 @@
       let config = field.batchConfig;
 
       if(_.allEqual(config.ogValues)) {
-        if(_.first(config.ogValues) == (field.onValue || true)) {
-          field.undefinedClass = 'semi-transparent';
-        }
-        else {
-          field.undefinedClass = 'disabled semi-transparent';
-        }
+        cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       }
     }
 
