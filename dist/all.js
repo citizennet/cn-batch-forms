@@ -661,7 +661,11 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       } else if (mode === 'append') {
         var originalVal = original.get();
         if (_.isArray(originalVal)) {
-          update.set(originalVal.concat(val));
+          var uniqVal = _([]).concat(originalVal, val).uniq(function (value) {
+            return value.key || value;
+          }).value();
+
+          update.set(uniqVal);
         } else if (_.isString(originalVal)) {
           update.set(originalVal + ' ' + val.trim());
         } else {
