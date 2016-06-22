@@ -121,6 +121,8 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
     var instances = 0;
 
+    console.log('TODO:', 'move cn-facebook-creative type out');
+
     var fieldTypeHandlers = {
       'string': processDefault,
       'number': processNumber,
@@ -129,7 +131,8 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       'cn-autocomplete': processSelect,
       'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
-      'cn-toggle': processToggle
+      'cn-toggle': processToggle,
+      'cn-facebook-creative': processSelect
     };
 
     return {
@@ -699,6 +702,10 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       config.editModes = config.editModes || ['replace', 'prepend', 'append'];
 
       config.default = config.default || 'append';
+
+      if (!config.editModes.includes(config.default)) {
+        config.default = config.editModes[0];
+      }
 
       config.onSelect = {
         replace: function replace() {

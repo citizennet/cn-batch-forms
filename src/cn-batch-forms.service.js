@@ -21,6 +21,8 @@
 
     let instances = 0;
 
+    console.log('TODO:', 'move cn-facebook-creative type out');
+
     let fieldTypeHandlers = {
       'string': processDefault,
       'number': processNumber,
@@ -29,7 +31,8 @@
       'cn-autocomplete': processSelect,
       'cn-currency': processNumber,
       'cn-datetimepicker': processDate,
-      'cn-toggle': processToggle
+      'cn-toggle': processToggle,
+      'cn-facebook-creative': processSelect
     };
 
     return {
@@ -411,7 +414,7 @@
           let handler = this.handleLinks(_.without(keys, key), hard);
           field.watch = field.watch || [];
           dirtyCheck.watch = dirtyCheck.watch || [];
-          field.watch.push({resolution() {handler(true)}});
+          field.watch.push({resolution() {handler(true);}});
           dirtyCheck.watch.push({resolution: handler});
         });
       });
@@ -590,6 +593,10 @@
       config.editModes = config.editModes || ['replace', 'prepend', 'append'];
 
       config.default = config.default || 'append';
+
+      if(!config.editModes.includes(config.default)) {
+        config.default = config.editModes[0];
+      }
 
       config.onSelect = {
         replace: () => {
