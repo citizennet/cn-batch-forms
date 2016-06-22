@@ -543,8 +543,13 @@
       }
       else if(mode === 'append') {
         let originalVal = original.get();
-        if(_.isArray(originalVal)) {
-          update.set(originalVal.concat(val));
+        if (_.isArray(originalVal)) {
+          const uniqVal = _([])
+            .concat(originalVal, val)
+            .uniq((value) => value.key || value)
+            .value();
+         
+          update.set(uniqVal);
         }
         else if(_.isString(originalVal)) {
           update.set(`${originalVal} ${val.trim()}`);
