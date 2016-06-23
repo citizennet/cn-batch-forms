@@ -1,7 +1,33 @@
 (function() {
   angular
       .module('cn.batch-forms')
-      .factory('cnBatchForms', cnBatchForms);
+      .provider('cnBatchForms', cnBatchFormsProvider);
+
+  let fieldTypeHandlers = {
+    'string': 'processDefault',
+    'number': 'processNumber',
+    'url': 'processDefault',
+    'array': 'processSelect',
+    'cn-autocomplete': 'processSelect',
+    'cn-currency': 'processNumber',
+    'cn-datetimepicker': 'processDate',
+    'cn-toggle': 'processToggle'
+  };
+
+  function cnBatchFormsProvider() {
+    return {
+      registerField,
+      $get: cnBatchForms
+    };
+
+    ///////////
+
+    function registerField(fieldType) {
+      if(fieldType.handler) {
+        fieldTypeHandlers[fieldType.type] = fieldType.handler;
+      }
+    }
+  }
 
   cnBatchForms.$inject = [
     'cnFlexFormService',
@@ -20,20 +46,6 @@
       cnModal) {
 
     let instances = 0;
-
-    console.log('TODO:', 'move cn-facebook-creative type out');
-
-    let fieldTypeHandlers = {
-      'string': processDefault,
-      'number': processNumber,
-      'url': 'processDefault',
-      'array': processSelect,
-      'cn-autocomplete': processSelect,
-      'cn-currency': processNumber,
-      'cn-datetimepicker': processDate,
-      'cn-toggle': processToggle,
-      'cn-facebook-creative': processSelect
-    };
 
     return {
       augmentSchema
@@ -194,6 +206,7 @@
         let handler = fieldTypeHandlers[fieldType];
 
         if(handler) {
+          if(_.isString(handler)) handler = this[handler];
           if(!_.isObject(field.batchConfig)) field.batchConfig = {};
           field.batchConfig.ogValues = this.getModelValues(field);
 
@@ -551,7 +564,7 @@
             .concat(originalVal, val)
             .uniq((value) => value.key || value)
             .value();
-         
+
           update.set(uniqVal);
         }
         else if(_.isString(originalVal)) {

@@ -114,26 +114,38 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
 
 (function () {
-  angular.module('cn.batch-forms').factory('cnBatchForms', cnBatchForms);
+  angular.module('cn.batch-forms').provider('cnBatchForms', cnBatchFormsProvider);
+
+  var fieldTypeHandlers = {
+    'string': 'processDefault',
+    'number': 'processNumber',
+    'url': 'processDefault',
+    'array': 'processSelect',
+    'cn-autocomplete': 'processSelect',
+    'cn-currency': 'processNumber',
+    'cn-datetimepicker': 'processDate',
+    'cn-toggle': 'processToggle'
+  };
+
+  function cnBatchFormsProvider() {
+    return {
+      registerField: registerField,
+      $get: cnBatchForms
+    };
+
+    ///////////
+
+    function registerField(fieldType) {
+      if (fieldType.handler) {
+        fieldTypeHandlers[fieldType.type] = fieldType.handler;
+      }
+    }
+  }
 
   cnBatchForms.$inject = ['cnFlexFormService', 'cnFlexFormTypes', 'sfPath', '$rootScope', '$timeout', 'cnModal'];
   function cnBatchForms(cnFlexFormService, cnFlexFormTypes, sfPath, $rootScope, $timeout, cnModal) {
 
     var instances = 0;
-
-    console.log('TODO:', 'move cn-facebook-creative type out');
-
-    var fieldTypeHandlers = {
-      'string': processDefault,
-      'number': processNumber,
-      'url': 'processDefault',
-      'array': processSelect,
-      'cn-autocomplete': processSelect,
-      'cn-currency': processNumber,
-      'cn-datetimepicker': processDate,
-      'cn-toggle': processToggle,
-      'cn-facebook-creative': processSelect
-    };
 
     return {
       augmentSchema: augmentSchema
@@ -294,6 +306,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         var handler = fieldTypeHandlers[fieldType];
 
         if (handler) {
+          if (_.isString(handler)) handler = this[handler];
           if (!_.isObject(field.batchConfig)) field.batchConfig = {};
           field.batchConfig.ogValues = this.getModelValues(field);
 
