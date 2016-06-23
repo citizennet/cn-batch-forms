@@ -1,7 +1,33 @@
 (function() {
   angular
       .module('cn.batch-forms')
-      .factory('cnBatchForms', cnBatchForms);
+      .provider('cnBatchForms', cnBatchFormsProvider);
+
+  let fieldTypeHandlers = {
+    'string': 'processDefault',
+    'number': 'processNumber',
+    'url': 'processDefault',
+    'array': 'processSelect',
+    'cn-autocomplete': 'processSelect',
+    'cn-currency': 'processNumber',
+    'cn-datetimepicker': 'processDate',
+    'cn-toggle': 'processToggle'
+  };
+
+  function cnBatchFormsProvider() {
+    return {
+      registerField,
+      $get: cnBatchForms
+    };
+
+    ///////////
+
+    function registerField(fieldType) {
+      if(fieldType.handler) {
+        fieldTypeHandlers[fieldType.type] = fieldType.handler;
+      }
+    }
+  }
 
   cnBatchForms.$inject = [
     'cnFlexFormService',
@@ -20,17 +46,6 @@
       cnModal) {
 
     let instances = 0;
-
-    let fieldTypeHandlers = {
-      'string': processDefault,
-      'number': processNumber,
-      'url': 'processDefault',
-      'array': processSelect,
-      'cn-autocomplete': processSelect,
-      'cn-currency': processNumber,
-      'cn-datetimepicker': processDate,
-      'cn-toggle': processToggle
-    };
 
     return {
       augmentSchema
@@ -191,6 +206,7 @@
         let handler = fieldTypeHandlers[fieldType];
 
         if(handler) {
+          if(_.isString(handler)) handler = this[handler];
           if(!_.isObject(field.batchConfig)) field.batchConfig = {};
           field.batchConfig.ogValues = this.getModelValues(field);
 
@@ -411,7 +427,7 @@
           let handler = this.handleLinks(_.without(keys, key), hard);
           field.watch = field.watch || [];
           dirtyCheck.watch = dirtyCheck.watch || [];
-          field.watch.push({resolution() {handler(true)}});
+          field.watch.push({resolution() {handler(true);}});
           dirtyCheck.watch.push({resolution: handler});
         });
       });
@@ -543,8 +559,13 @@
       }
       else if(mode === 'append') {
         let originalVal = original.get();
-        if(_.isArray(originalVal)) {
-          update.set(originalVal.concat(val));
+        if (_.isArray(originalVal)) {
+          const uniqVal = _([])
+            .concat(originalVal, val)
+            .uniq((value) => value.key || value)
+            .value();
+
+          update.set(uniqVal);
         }
         else if(_.isString(originalVal)) {
           update.set(`${originalVal} ${val.trim()}`);
@@ -590,6 +611,10 @@
       config.editModes = config.editModes || ['replace', 'prepend', 'append'];
 
       config.default = config.default || 'append';
+
+      if(!config.editModes.includes(config.default)) {
+        config.default = config.editModes[0];
+      }
 
       config.onSelect = {
         replace: () => {
