@@ -67,7 +67,6 @@
         addMeta,
         addToSchema,
         buildModelDefault,
-        clearDefaults,
         clearSchemaDefault,
         closeModal,
         createDirtyCheck,
@@ -81,6 +80,7 @@
         handleLinks,
         onFieldScope,
         processCondition,
+        processSchema,
         processForm,
         processField,
         processItems,
@@ -91,6 +91,8 @@
         processNumber,
         processSelect,
         processToggle,
+        resetDefaults,
+        restoreDefaults,
         setValidation,
         setValue,
         showResults
@@ -107,10 +109,11 @@
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.defaults = {};
       this.editModes = {};
       this.fieldRegister = {};
 
-      this.clearDefaults();
+      this.processSchema();
 
       if(schema.forms) {
         let i = schema.forms.length - 1;
@@ -720,9 +723,10 @@
       }
     }
 
-    function clearDefaults() {
+    function processSchema() {
       this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+      console.log('this.defaults:', this.defaults);
 
       this.schema.schema.properties.__batchConfig = {
         type: 'object',
@@ -733,16 +737,45 @@
         type: 'object',
         properties: {}
       };
+
+      $rootScope.$on('schemaFormBeforeAppendToArray', (e, form) => this.restoreDefaults(form));
+
+      $rootScope.$on('schemaFormAfterAppendToArray', (e, form) => this.resetDefaults(form));
     }
 
-    function clearSchemaDefault(schema) {
+    function restoreDefaults(form) {
+      if(!form.items) return;
+      form.items.forEach(item => {
+        let key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
+        item.schema.default = this.defaults[key];
+        this.restoreDefaults(item);
+      });
+    }
+
+    function resetDefaults(form) {
+      if(!form.items) return;
+      form.items.forEach(item => {
+        item.schema.default = undefined;
+        this.resetDefaults(item);
+      });
+    }
+
+    function clearSchemaDefault(schema, key) {
+      // save for hydrating newly added array items
+      this.defaults[key] = schema.default;
+
+      // then remove because we don't want to override saved values with defaults
       schema.default = undefined;
+
       if(schema.type === 'object' && schema.properties) {
         schema.required = undefined;
-        _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        // _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        for(let k in schema.properties) {
+          this.clearSchemaDefault(schema.properties[k], `${key}.${k}`);
+        }
       }
       else if(schema.type === 'array' && schema.items) {
-        this.clearSchemaDefault(schema.items);
+        this.clearSchemaDefault(schema.items, `${key}[]`);
       }
     }
 

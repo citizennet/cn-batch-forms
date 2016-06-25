@@ -167,7 +167,6 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         addMeta: addMeta,
         addToSchema: addToSchema,
         buildModelDefault: buildModelDefault,
-        clearDefaults: clearDefaults,
         clearSchemaDefault: clearSchemaDefault,
         closeModal: closeModal,
         createDirtyCheck: createDirtyCheck,
@@ -181,6 +180,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         handleLinks: handleLinks,
         onFieldScope: onFieldScope,
         processCondition: processCondition,
+        processSchema: processSchema,
         processForm: processForm,
         processField: processField,
         processItems: processItems,
@@ -191,6 +191,8 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         processNumber: processNumber,
         processSelect: processSelect,
         processToggle: processToggle,
+        resetDefaults: resetDefaults,
+        restoreDefaults: restoreDefaults,
         setValidation: setValidation,
         setValue: setValue,
         showResults: showResults
@@ -207,10 +209,11 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.defaults = {};
       this.editModes = {};
       this.fieldRegister = {};
 
-      this.clearDefaults();
+      this.processSchema();
 
       if (schema.forms) {
         var i = schema.forms.length - 1;
@@ -826,9 +829,12 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       }
     }
 
-    function clearDefaults() {
+    function processSchema() {
+      var _this10 = this;
+
       this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+      console.log('this.defaults:', this.defaults);
 
       this.schema.schema.properties.__batchConfig = {
         type: 'object',
@@ -839,20 +845,57 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         type: 'object',
         properties: {}
       };
+
+      $rootScope.$on('schemaFormBeforeAppendToArray', function (e, form) {
+        return _this10.restoreDefaults(form);
+      });
+
+      $rootScope.$on('schemaFormAfterAppendToArray', function (e, form) {
+        return _this10.resetDefaults(form);
+      });
     }
 
-    function clearSchemaDefault(schema) {
+    function restoreDefaults(form) {
+      var _this11 = this;
+
+      if (!form.items) return;
+      form.items.forEach(function (item) {
+        var key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
+        item.schema.default = _this11.defaults[key];
+        _this11.restoreDefaults(item);
+      });
+    }
+
+    function resetDefaults(form) {
+      var _this12 = this;
+
+      if (!form.items) return;
+      form.items.forEach(function (item) {
+        item.schema.default = undefined;
+        _this12.resetDefaults(item);
+      });
+    }
+
+    function clearSchemaDefault(schema, key) {
+      // save for hydrating newly added array items
+      this.defaults[key] = schema.default;
+
+      // then remove because we don't want to override saved values with defaults
       schema.default = undefined;
+
       if (schema.type === 'object' && schema.properties) {
         schema.required = undefined;
-        _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        // _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        for (var k in schema.properties) {
+          this.clearSchemaDefault(schema.properties[k], key + '.' + k);
+        }
       } else if (schema.type === 'array' && schema.items) {
-        this.clearSchemaDefault(schema.items);
+        this.clearSchemaDefault(schema.items, key + '[]');
       }
     }
 
     function showResults(results, config) {
-      var _this10 = this;
+      var _this13 = this;
 
       this.results = results;
       this.resultsConfig = config;
@@ -867,7 +910,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         templateUrl: 'cn-batch-forms/batch-results.html',
         resolve: {
           parent: function parent() {
-            return _this10;
+            return _this13;
           }
         }
       });
