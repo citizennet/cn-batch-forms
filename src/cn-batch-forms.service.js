@@ -201,6 +201,8 @@
         if(!field.batchConfig) return false;
 
         field._key = field.key;
+        field._placeholder = field.placeholder;
+        console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
         //field.required = false;
@@ -608,6 +610,12 @@
       */
     }
 
+    function setPlaceholder(field, val) {
+      if(!field.noBatchPlaceholder) {
+        field._placeholder = val;
+      }
+    }
+
     function processDefault(field) {
       let config = field.batchConfig;
 
@@ -625,14 +633,14 @@
             cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
           }
           else {
-            field.placeholder = '—';
+            setPlaceholder(field, '—');
           }
         },
         append: () => {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         },
         prepend: () => {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         }
       };
     }
@@ -654,7 +662,7 @@
       if (field.items) {
         field.items.forEach(setNestedPlaceholder);
       } else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -699,7 +707,7 @@
         }
 
         if(!field.placeholder) {
-          field.placeholder = '—';
+          setPlaceholder(field, '—');
         }
       }
     }
@@ -711,7 +719,7 @@
         cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       }
       else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -739,15 +747,20 @@
       };
 
       $rootScope.$on('schemaFormBeforeAppendToArray', (e, form) => this.restoreDefaults(form));
-
       $rootScope.$on('schemaFormAfterAppendToArray', (e, form) => this.resetDefaults(form));
     }
 
     function restoreDefaults(form) {
       if(!form.items) return;
       form.items.forEach(item => {
-        let key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
-        item.schema.default = this.defaults[key];
+        if(item.key) {
+          if(item.schema) {
+            let key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
+            item.schema.default = this.defaults[key];
+          }
+          item.placeholder = item._placeholder;
+          item.noBatchPlaceholder = true;
+        }
         this.restoreDefaults(item);
       });
     }
@@ -755,7 +768,9 @@
     function resetDefaults(form) {
       if(!form.items) return;
       form.items.forEach(item => {
-        item.schema.default = undefined;
+        if(item.schema) {
+          item.schema.default = undefined;
+        }
         this.resetDefaults(item);
       });
     }

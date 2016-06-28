@@ -301,6 +301,8 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         if (!field.batchConfig) return false;
 
         field._key = field.key;
+        field._placeholder = field.placeholder;
+        console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
         //field.required = false;
@@ -714,6 +716,12 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       */
     }
 
+    function setPlaceholder(field, val) {
+      if (!field.noBatchPlaceholder) {
+        field._placeholder = val;
+      }
+    }
+
     function processDefault(field) {
       var _this8 = this;
 
@@ -732,14 +740,14 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
           if (_.allEqual(config.ogValues)) {
             cnFlexFormService.parseExpression(field.key, _this8.model).set(_.first(config.ogValues));
           } else {
-            field.placeholder = '—';
+            setPlaceholder(field, '—');
           }
         },
         append: function append() {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         },
         prepend: function prepend() {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         }
       };
     }
@@ -760,7 +768,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       if (field.items) {
         field.items.forEach(setNestedPlaceholder);
       } else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -806,7 +814,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         }
 
         if (!field.placeholder) {
-          field.placeholder = '—';
+          setPlaceholder(field, '—');
         }
       }
     }
@@ -817,7 +825,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       if (_.allEqual(config.ogValues)) {
         cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       } else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -849,7 +857,6 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       $rootScope.$on('schemaFormBeforeAppendToArray', function (e, form) {
         return _this10.restoreDefaults(form);
       });
-
       $rootScope.$on('schemaFormAfterAppendToArray', function (e, form) {
         return _this10.resetDefaults(form);
       });
@@ -860,8 +867,14 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
       if (!form.items) return;
       form.items.forEach(function (item) {
-        var key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
-        item.schema.default = _this11.defaults[key];
+        if (item.key) {
+          if (item.schema) {
+            var key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
+            item.schema.default = _this11.defaults[key];
+          }
+          item.placeholder = item._placeholder;
+          item.noBatchPlaceholder = true;
+        }
         _this11.restoreDefaults(item);
       });
     }
@@ -871,7 +884,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
       if (!form.items) return;
       form.items.forEach(function (item) {
-        item.schema.default = undefined;
+        if (item.schema) {
+          item.schema.default = undefined;
+        }
         _this12.resetDefaults(item);
       });
     }
