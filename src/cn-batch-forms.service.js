@@ -673,7 +673,7 @@
       if(type === 'array') {
         config.editModes = config.editModes || ['replace', 'append'];
 
-        config.default = config.default || 'append';
+        config.default = config.default || 'replace';
 
         if (_.allEqual(config.ogValues)) {
           cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
