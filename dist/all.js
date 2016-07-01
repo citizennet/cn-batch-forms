@@ -179,6 +179,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         getTitleMap: getTitleMap,
         handleLinks: handleLinks,
         onFieldScope: onFieldScope,
+        onReprocessField: onReprocessField,
         processCondition: processCondition,
         processSchema: processSchema,
         processForm: processForm,
@@ -191,6 +192,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         processNumber: processNumber,
         processSelect: processSelect,
         processToggle: processToggle,
+        registerFieldWatch: registerFieldWatch,
         resetDefaults: resetDefaults,
         restoreDefaults: restoreDefaults,
         setValidation: setValidation,
@@ -233,6 +235,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       this.processLinks();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
+      $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
       console.log('BatchDone:', schema, model, models);
 
@@ -278,10 +281,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
             condition: this.processCondition(child.condition)
           };
           delete child.condition;
-          this.fieldRegister[child.key] = {
-            field: child,
-            dirtyCheck: dirtyCheck
-          };
+          if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
+          this.fieldRegister[child.key].field = child;
+          this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
         }
         if (!show) {
           // remove field if batch isn't supported by it or children
@@ -486,15 +488,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         notitle: true
       });
 
-      if (field.watch) {
-        if (!_.isArray(field.watch)) field.watch = [field.watch];
-      } else {
-        field.watch = [];
-      }
-
       var model = this.buildModelDefault(field.key, field.schema) || {};
 
-      field.watch.push({
+      dirtyCheck.fieldWatch = {
         resolution: function resolution(val) {
           if (!angular.equals(val, model[field._key])) {
             var register = _this4.fieldRegister[field._key];
@@ -512,9 +508,26 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
               }
           }
         }
-      });
+      };
+
+      this.registerFieldWatch(field, dirtyCheck.fieldWatch);
 
       return dirtyCheck;
+    }
+
+    function registerFieldWatch(field, watch) {
+      if (field.watch) {
+        if (!_.isArray(field.watch)) field.watch = [field.watch];
+      } else {
+        field.watch = [];
+      }
+
+      field.watch.push(watch);
+    }
+
+    function onReprocessField(e, key) {
+      var register = this.fieldRegister[key];
+      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
     function handleLinks(list, hard) {

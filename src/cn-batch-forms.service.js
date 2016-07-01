@@ -79,6 +79,7 @@
         getTitleMap,
         handleLinks,
         onFieldScope,
+        onReprocessField,
         processCondition,
         processSchema,
         processForm,
@@ -91,6 +92,7 @@
         processNumber,
         processSelect,
         processToggle,
+        registerFieldWatch,
         resetDefaults,
         restoreDefaults,
         setValidation,
@@ -134,6 +136,7 @@
       this.processLinks();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
+      $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
       console.log('BatchDone:', schema, model, models);
 
@@ -178,10 +181,9 @@
             condition: this.processCondition(child.condition)
           };
           delete child.condition;
-          this.fieldRegister[child.key] = {
-            field: child,
-            dirtyCheck
-          };
+          if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
+          this.fieldRegister[child.key].field = child;
+          this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
         }
         if(!show) {
           // remove field if batch isn't supported by it or children
@@ -374,16 +376,9 @@
         notitle: true
       });
 
-      if(field.watch) {
-        if(!_.isArray(field.watch)) field.watch = [field.watch];
-      }
-      else {
-        field.watch = [];
-      }
-
       let model = this.buildModelDefault(field.key, field.schema) || {};
 
-      field.watch.push({
+      dirtyCheck.fieldWatch = {
         resolution: val => {
           if(!angular.equals(val, model[field._key])) {
             let register = this.fieldRegister[field._key];
@@ -402,9 +397,27 @@
             }
           }
         }
-      });
+      };
+
+      this.registerFieldWatch(field, dirtyCheck.fieldWatch);
 
       return dirtyCheck;
+    }
+
+    function registerFieldWatch(field, watch) {
+      if(field.watch) {
+        if(!_.isArray(field.watch)) field.watch = [field.watch];
+      }
+      else {
+        field.watch = [];
+      }
+
+      field.watch.push(watch);
+    }
+
+    function onReprocessField(e, key) {
+      let register = this.fieldRegister[key];
+      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
     function handleLinks(list, hard) {
