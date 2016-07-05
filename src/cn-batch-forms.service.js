@@ -67,7 +67,6 @@
         addMeta,
         addToSchema,
         buildModelDefault,
-        clearDefaults,
         clearSchemaDefault,
         closeModal,
         createDirtyCheck,
@@ -80,7 +79,9 @@
         getTitleMap,
         handleLinks,
         onFieldScope,
+        onReprocessField,
         processCondition,
+        processSchema,
         processForm,
         processField,
         processItems,
@@ -91,6 +92,9 @@
         processNumber,
         processSelect,
         processToggle,
+        registerFieldWatch,
+        resetDefaults,
+        restoreDefaults,
         setValidation,
         setValue,
         showResults
@@ -107,10 +111,11 @@
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.defaults = {};
       this.editModes = {};
       this.fieldRegister = {};
 
-      this.clearDefaults();
+      this.processSchema();
 
       if(schema.forms) {
         let i = schema.forms.length - 1;
@@ -131,6 +136,7 @@
       this.processLinks();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
+      $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
       console.log('BatchDone:', schema, model, models);
 
@@ -175,10 +181,9 @@
             condition: this.processCondition(child.condition)
           };
           delete child.condition;
-          this.fieldRegister[child.key] = {
-            field: child,
-            dirtyCheck
-          };
+          if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
+          this.fieldRegister[child.key].field = child;
+          this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
         }
         if(!show) {
           // remove field if batch isn't supported by it or children
@@ -198,6 +203,8 @@
         if(!field.batchConfig) return false;
 
         field._key = field.key;
+        field._placeholder = field.placeholder;
+        console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
         //field.required = false;
@@ -369,16 +376,9 @@
         notitle: true
       });
 
-      if(field.watch) {
-        if(!_.isArray(field.watch)) field.watch = [field.watch];
-      }
-      else {
-        field.watch = [];
-      }
-
       let model = this.buildModelDefault(field.key, field.schema) || {};
 
-      field.watch.push({
+      dirtyCheck.fieldWatch = {
         resolution: val => {
           if(!angular.equals(val, model[field._key])) {
             let register = this.fieldRegister[field._key];
@@ -397,9 +397,27 @@
             }
           }
         }
-      });
+      };
+
+      this.registerFieldWatch(field, dirtyCheck.fieldWatch);
 
       return dirtyCheck;
+    }
+
+    function registerFieldWatch(field, watch) {
+      if(field.watch) {
+        if(!_.isArray(field.watch)) field.watch = [field.watch];
+      }
+      else {
+        field.watch = [];
+      }
+
+      field.watch.push(watch);
+    }
+
+    function onReprocessField(e, key) {
+      let register = this.fieldRegister[key];
+      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
     function handleLinks(list, hard) {
@@ -605,6 +623,12 @@
       */
     }
 
+    function setPlaceholder(field, val) {
+      if(!field.noBatchPlaceholder) {
+        field._placeholder = val;
+      }
+    }
+
     function processDefault(field) {
       let config = field.batchConfig;
 
@@ -622,14 +646,14 @@
             cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
           }
           else {
-            field.placeholder = '—';
+            setPlaceholder(field, '—');
           }
         },
         append: () => {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         },
         prepend: () => {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         }
       };
     }
@@ -651,7 +675,7 @@
       if (field.items) {
         field.items.forEach(setNestedPlaceholder);
       } else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -662,7 +686,7 @@
       if(type === 'array') {
         config.editModes = config.editModes || ['replace', 'append'];
 
-        config.default = config.default || 'append';
+        config.default = config.default || 'replace';
 
         if (_.allEqual(config.ogValues)) {
           cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
@@ -696,7 +720,7 @@
         }
 
         if(!field.placeholder) {
-          field.placeholder = '—';
+          setPlaceholder(field, '—');
         }
       }
     }
@@ -708,7 +732,7 @@
         cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       }
       else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -720,9 +744,10 @@
       }
     }
 
-    function clearDefaults() {
+    function processSchema() {
       this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+      console.log('this.defaults:', this.defaults);
 
       this.schema.schema.properties.__batchConfig = {
         type: 'object',
@@ -733,16 +758,52 @@
         type: 'object',
         properties: {}
       };
+
+      $rootScope.$on('schemaFormBeforeAppendToArray', (e, form) => this.restoreDefaults(form));
+      $rootScope.$on('schemaFormAfterAppendToArray', (e, form) => this.resetDefaults(form));
     }
 
-    function clearSchemaDefault(schema) {
+    function restoreDefaults(form) {
+      if(!form.items) return;
+      form.items.forEach(item => {
+        if(item.key) {
+          if(item.schema) {
+            let key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
+            item.schema.default = this.defaults[key];
+          }
+          item.placeholder = item._placeholder;
+          item.noBatchPlaceholder = true;
+        }
+        this.restoreDefaults(item);
+      });
+    }
+
+    function resetDefaults(form) {
+      if(!form.items) return;
+      form.items.forEach(item => {
+        if(item.schema) {
+          item.schema.default = undefined;
+        }
+        this.resetDefaults(item);
+      });
+    }
+
+    function clearSchemaDefault(schema, key) {
+      // save for hydrating newly added array items
+      this.defaults[key] = schema.default;
+
+      // then remove because we don't want to override saved values with defaults
       schema.default = undefined;
+
       if(schema.type === 'object' && schema.properties) {
         schema.required = undefined;
-        _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        // _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        for(let k in schema.properties) {
+          this.clearSchemaDefault(schema.properties[k], `${key}.${k}`);
+        }
       }
       else if(schema.type === 'array' && schema.items) {
-        this.clearSchemaDefault(schema.items);
+        this.clearSchemaDefault(schema.items, `${key}[]`);
       }
     }
 

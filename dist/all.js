@@ -167,7 +167,6 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         addMeta: addMeta,
         addToSchema: addToSchema,
         buildModelDefault: buildModelDefault,
-        clearDefaults: clearDefaults,
         clearSchemaDefault: clearSchemaDefault,
         closeModal: closeModal,
         createDirtyCheck: createDirtyCheck,
@@ -180,7 +179,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         getTitleMap: getTitleMap,
         handleLinks: handleLinks,
         onFieldScope: onFieldScope,
+        onReprocessField: onReprocessField,
         processCondition: processCondition,
+        processSchema: processSchema,
         processForm: processForm,
         processField: processField,
         processItems: processItems,
@@ -191,6 +192,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         processNumber: processNumber,
         processSelect: processSelect,
         processToggle: processToggle,
+        registerFieldWatch: registerFieldWatch,
+        resetDefaults: resetDefaults,
+        restoreDefaults: restoreDefaults,
         setValidation: setValidation,
         setValue: setValue,
         showResults: showResults
@@ -207,10 +211,11 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       this.schema = schema;
       this.model = model;
       this.models = models;
+      this.defaults = {};
       this.editModes = {};
       this.fieldRegister = {};
 
-      this.clearDefaults();
+      this.processSchema();
 
       if (schema.forms) {
         var i = schema.forms.length - 1;
@@ -230,6 +235,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       this.processLinks();
 
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
+      $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
       console.log('BatchDone:', schema, model, models);
 
@@ -275,10 +281,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
             condition: this.processCondition(child.condition)
           };
           delete child.condition;
-          this.fieldRegister[child.key] = {
-            field: child,
-            dirtyCheck: dirtyCheck
-          };
+          if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
+          this.fieldRegister[child.key].field = child;
+          this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
         }
         if (!show) {
           // remove field if batch isn't supported by it or children
@@ -298,6 +303,8 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         if (!field.batchConfig) return false;
 
         field._key = field.key;
+        field._placeholder = field.placeholder;
+        console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
         //field.required = false;
@@ -481,15 +488,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         notitle: true
       });
 
-      if (field.watch) {
-        if (!_.isArray(field.watch)) field.watch = [field.watch];
-      } else {
-        field.watch = [];
-      }
-
       var model = this.buildModelDefault(field.key, field.schema) || {};
 
-      field.watch.push({
+      dirtyCheck.fieldWatch = {
         resolution: function resolution(val) {
           if (!angular.equals(val, model[field._key])) {
             var register = _this4.fieldRegister[field._key];
@@ -507,9 +508,26 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
               }
           }
         }
-      });
+      };
+
+      this.registerFieldWatch(field, dirtyCheck.fieldWatch);
 
       return dirtyCheck;
+    }
+
+    function registerFieldWatch(field, watch) {
+      if (field.watch) {
+        if (!_.isArray(field.watch)) field.watch = [field.watch];
+      } else {
+        field.watch = [];
+      }
+
+      field.watch.push(watch);
+    }
+
+    function onReprocessField(e, key) {
+      var register = this.fieldRegister[key];
+      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
     function handleLinks(list, hard) {
@@ -711,6 +729,12 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       */
     }
 
+    function setPlaceholder(field, val) {
+      if (!field.noBatchPlaceholder) {
+        field._placeholder = val;
+      }
+    }
+
     function processDefault(field) {
       var _this8 = this;
 
@@ -729,14 +753,14 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
           if (_.allEqual(config.ogValues)) {
             cnFlexFormService.parseExpression(field.key, _this8.model).set(_.first(config.ogValues));
           } else {
-            field.placeholder = '—';
+            setPlaceholder(field, '—');
           }
         },
         append: function append() {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         },
         prepend: function prepend() {
-          field.placeholder = '';
+          setPlaceholder(field, '');
         }
       };
     }
@@ -757,7 +781,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       if (field.items) {
         field.items.forEach(setNestedPlaceholder);
       } else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -770,7 +794,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       if (type === 'array') {
         config.editModes = config.editModes || ['replace', 'append'];
 
-        config.default = config.default || 'append';
+        config.default = config.default || 'replace';
 
         if (_.allEqual(config.ogValues)) {
           cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
@@ -803,7 +827,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         }
 
         if (!field.placeholder) {
-          field.placeholder = '—';
+          setPlaceholder(field, '—');
         }
       }
     }
@@ -814,7 +838,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       if (_.allEqual(config.ogValues)) {
         cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       } else {
-        field.placeholder = '—';
+        setPlaceholder(field, '—');
       }
     }
 
@@ -826,9 +850,12 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       }
     }
 
-    function clearDefaults() {
+    function processSchema() {
+      var _this10 = this;
+
       this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+      console.log('this.defaults:', this.defaults);
 
       this.schema.schema.properties.__batchConfig = {
         type: 'object',
@@ -839,20 +866,64 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         type: 'object',
         properties: {}
       };
+
+      $rootScope.$on('schemaFormBeforeAppendToArray', function (e, form) {
+        return _this10.restoreDefaults(form);
+      });
+      $rootScope.$on('schemaFormAfterAppendToArray', function (e, form) {
+        return _this10.resetDefaults(form);
+      });
     }
 
-    function clearSchemaDefault(schema) {
+    function restoreDefaults(form) {
+      var _this11 = this;
+
+      if (!form.items) return;
+      form.items.forEach(function (item) {
+        if (item.key) {
+          if (item.schema) {
+            var key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
+            item.schema.default = _this11.defaults[key];
+          }
+          item.placeholder = item._placeholder;
+          item.noBatchPlaceholder = true;
+        }
+        _this11.restoreDefaults(item);
+      });
+    }
+
+    function resetDefaults(form) {
+      var _this12 = this;
+
+      if (!form.items) return;
+      form.items.forEach(function (item) {
+        if (item.schema) {
+          item.schema.default = undefined;
+        }
+        _this12.resetDefaults(item);
+      });
+    }
+
+    function clearSchemaDefault(schema, key) {
+      // save for hydrating newly added array items
+      this.defaults[key] = schema.default;
+
+      // then remove because we don't want to override saved values with defaults
       schema.default = undefined;
+
       if (schema.type === 'object' && schema.properties) {
         schema.required = undefined;
-        _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        // _.each(schema.properties, this.clearSchemaDefault.bind(this));
+        for (var k in schema.properties) {
+          this.clearSchemaDefault(schema.properties[k], key + '.' + k);
+        }
       } else if (schema.type === 'array' && schema.items) {
-        this.clearSchemaDefault(schema.items);
+        this.clearSchemaDefault(schema.items, key + '[]');
       }
     }
 
     function showResults(results, config) {
-      var _this10 = this;
+      var _this13 = this;
 
       this.results = results;
       this.resultsConfig = config;
@@ -867,7 +938,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         templateUrl: 'cn-batch-forms/batch-results.html',
         resolve: {
           parent: function parent() {
-            return _this10;
+            return _this13;
           }
         }
       });
