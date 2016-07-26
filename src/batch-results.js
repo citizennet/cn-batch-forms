@@ -17,6 +17,7 @@
     vm.config = vm.parent.resultsConfig;
     vm.displayName = vm.config && vm.config.displayName || 'name';
     vm.formName = $state.current.name;
+    vm.text = vm.config.text;
 
     vm.activate = activate;
     vm.submit = submit;
