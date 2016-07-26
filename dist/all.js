@@ -24,6 +24,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     vm.config = vm.parent.resultsConfig;
     vm.displayName = vm.config && vm.config.displayName || 'name';
     vm.formName = $state.current.name;
+    vm.text = vm.config.text;
 
     vm.activate = activate;
     vm.submit = submit;
@@ -109,9 +110,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 })();
 'use strict';
 
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
 
-function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 (function () {
   angular.module('cn.batch-forms').provider('cnBatchForms', cnBatchFormsProvider);
@@ -443,14 +444,14 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       var _this3 = this;
 
       if (key.includes('[]')) {
-        var _ret = (function () {
+        var _ret = function () {
           var re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
           return {
             v: _.filter(_this3.fieldRegister, function (form, k) {
               return re.test(k);
             })
           };
-        })();
+        }();
 
         if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
       } else {
@@ -585,7 +586,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
     function buildModelDefault(key, schema) {
       if (schema.type === 'array') {
-        var _ret2 = (function () {
+        var _ret2 = function () {
           var model = _defineProperty({}, key, []);
           if (schema.items) {
             _.each(schema.items.properties, function (v, k) {
@@ -597,7 +598,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
           return {
             v: model
           };
-        })();
+        }();
 
         if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
       }
@@ -672,12 +673,12 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
             cnFlexFormService.parseExpression(assignable.fullPath, _this7.models[i]).set(val);
           } else {
-            var val = cnFlexFormService.parseExpression(key, _this7.model).get();
+            var _val = cnFlexFormService.parseExpression(key, _this7.model).get();
             var update = cnFlexFormService.parseExpression(key, models[i]);
             var original = cnFlexFormService.parseExpression(key, _this7.models[i]);
 
             //console.log('val, update, original:', val, update.get(), original.get(), key);
-            _this7.setValue(val, update, original, mode);
+            _this7.setValue(_val, update, original, mode);
           }
         });
       });
@@ -703,11 +704,11 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
           update.set(val);
         }
       } else if (mode === 'prepend') {
-        var originalVal = original.get();
-        if (_.isArray(originalVal)) {
-          update.set(val.concat(originalVal));
-        } else if (_.isString(originalVal)) {
-          update.set(val.trim() + ' ' + originalVal);
+        var _originalVal = original.get();
+        if (_.isArray(_originalVal)) {
+          update.set(val.concat(_originalVal));
+        } else if (_.isString(_originalVal)) {
+          update.set(val.trim() + ' ' + _originalVal);
         } else {
           update.set(val);
         }
@@ -976,5 +977,5 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 "use strict";
 
 angular.module("cn.batch-forms").run(["$templateCache", function ($templateCache) {
-  $templateCache.put("cn-batch-forms/batch-results.html", "<div class=\"cn-modal\">\n  <div class=\"modal-header clearfix\">\n    <cn-flex-form-header\n      ff-header-config=\"vm.headerConfig\"\n      ff-submit=\"vm.submit(handler)\">\n    </cn-flex-form-header>\n  </div>\n  <div class=\"modal-body cn-list\"\n       cn-responsive-height=\"80\"\n       cn-responsive-break=\"sm\"\n       cn-set-max-height>\n    <table class=\"table card-flex gutterless\">\n      <tbody>\n      <tr ng-repeat=\"result in vm.results\">\n        <td class=\"col-sm-10\">\n          <h6 ng-show=\"result.status == 200\">\n            {{result.body[vm.displayName]}}\n            <span class=\"text-mute\">({{result.body.id}})</span>\n          </h6>\n          <h6 ng-show=\"result.status != 200\">\n            {{vm.originals[$index][vm.displayName]}}\n            <span class=\"text-mute\">({{vm.originals[$index].id}})</span>\n          </h6>\n          <p ng-class=\"{\n               \'text-danger\': result.status != 200,\n               \'text-primary\': result.status == 200\n             }\">\n            <i class=\"fa fa-{{result.status == 200 ? \'check\' : \'times\'}}\"></i>\n            {{result.status == 200 ? \'updated successfully\' : result.body.message}}\n          </p>\n        </td>\n        <td class=\"col-sm-2 text-center\">\n          <a ng-show=\"result.editSref\"\n             class=\"btn btn-sm btn-transparent\"\n             ui-sref=\"{{result.editSref}}\">\n            <i class=\"icn-edit\"></i>\n          </a>\n        </td>\n      </tr>\n      </tbody>\n    </table>\n  </div>\n</div>\n");
+  $templateCache.put("cn-batch-forms/batch-results.html", "<div class=\"cn-modal\">\n  <div class=\"modal-header clearfix\">\n    <cn-flex-form-header\n      ff-header-config=\"vm.headerConfig\"\n      ff-submit=\"vm.submit(handler)\">\n    </cn-flex-form-header>\n  </div>\n  <div class=\"modal-body cn-list card-flex\"\n       cn-responsive-height=\"80\"\n       cn-responsive-break=\"sm\"\n       cn-set-max-height>\n\n    <div class=\"padding-20\"\n         ng-if=\"vm.text\">\n      <p class=\"no-margin text-mute\"\n         ng-bind-html=\"vm.text\">\n      </p>\n    </div>\n\n    <table class=\"table gutterless\">\n      <tbody>\n      <tr ng-repeat=\"result in vm.results\">\n        <td class=\"col-sm-10\">\n          <h6 ng-show=\"result.status == 200\">\n            {{result.body[vm.displayName]}}\n            <span class=\"text-mute\">({{result.body.id}})</span>\n          </h6>\n          <h6 ng-show=\"result.status != 200\">\n            {{vm.originals[$index][vm.displayName]}}\n            <span class=\"text-mute\">({{vm.originals[$index].id}})</span>\n          </h6>\n          <p ng-class=\"{\n               \'text-danger\': result.status != 200,\n               \'text-primary\': result.status == 200\n             }\">\n            <i class=\"fa fa-{{result.status == 200 ? \'check\' : \'times\'}}\"></i>\n            {{result.status == 200 ? \'updated successfully\' : result.body.message}}\n          </p>\n        </td>\n        <td class=\"col-sm-2 text-center\">\n          <a ng-show=\"result.editSref\"\n             class=\"btn btn-sm btn-transparent\"\n             ui-sref=\"{{result.editSref}}\">\n            <i class=\"icn-edit\"></i>\n          </a>\n        </td>\n      </tr>\n      </tbody>\n    </table>\n  </div>\n</div>\n");
 }]);
