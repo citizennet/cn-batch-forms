@@ -5,11 +5,19 @@
       ff-submit="vm.submit(handler)">
     </cn-flex-form-header>
   </div>
-  <div class="modal-body cn-list"
+  <div class="modal-body cn-list card-flex"
        cn-responsive-height="80"
        cn-responsive-break="sm"
        cn-set-max-height>
-    <table class="table card-flex gutterless">
+
+    <div class="padding-20"
+         ng-if="vm.text">
+      <p class="no-margin text-mute"
+         ng-bind-html="vm.text">
+      </p>
+    </div>
+
+    <table class="table gutterless">
       <tbody>
       <tr ng-repeat="result in vm.results">
         <td class="col-sm-10">
