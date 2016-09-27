@@ -308,7 +308,8 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
-        //field.required = false;
+        field.required = false;
+        if (field.conditionals) field.conditionals.required = false;
 
         var fieldType = cnFlexFormTypes.getFieldType(field);
         var handler = fieldTypeHandlers[fieldType];
