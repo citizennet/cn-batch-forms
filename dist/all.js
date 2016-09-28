@@ -308,8 +308,9 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
-        field.required = false;
-        if (field.conditionals) field.conditionals.required = false;
+
+        delete field.required;
+        if (field.conditionals) delete field.conditionals.required;
 
         var fieldType = cnFlexFormTypes.getFieldType(field);
         var handler = fieldTypeHandlers[fieldType];
