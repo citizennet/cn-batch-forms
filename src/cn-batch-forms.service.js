@@ -207,8 +207,9 @@
         console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
-        field.required = false;
-        if(field.conditionals) field.conditionals.required = false;
+
+        delete field.required;
+        if(field.conditionals) delete field.conditionals.required;
 
         let fieldType = cnFlexFormTypes.getFieldType(field);
         let handler = fieldTypeHandlers[fieldType];
