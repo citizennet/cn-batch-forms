@@ -615,7 +615,8 @@
         let key = original.path().key;
         let replaceString = cnFlexFormService.parseExpression(`_replace_${key}`, this.model);
         let withString = cnFlexFormService.parseExpression(`_with_${key}`, this.model);
-        update.set(original.get().replace(replaceString.get(), withString.get()));
+        let expression = new RegExp(replaceString.get(), "gi");
+        update.set(original.get().replace(expression, withString.get()));
       }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
