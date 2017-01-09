@@ -166,9 +166,8 @@
       //console.log('processItems:', field, children);
       let i = field[children].length - 1;
       while(i > -1) {
-        let child = field[children][i];
-        let show = this.processField(child);
-        if(child.batchConfig && show) {
+        let child = this.processField(field[children][i]);
+        if(child && child.batchConfig) {
           //console.log('child:', child);
           child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
           let batchField = this.createBatchField(child);
@@ -185,7 +184,7 @@
           this.fieldRegister[child.key].field = child;
           this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
         }
-        if(!show) {
+        if(!child) {
           // remove field if batch isn't supported by it or children
           field[children].splice(i, 1);
         }
@@ -225,7 +224,7 @@
             cnFlexFormService.parseExpression(key, this.model).set(first);
           }
 
-          handler.bind(this)(field);
+          return handler.bind(this)(field);
         }
         else return false;
       }
@@ -256,7 +255,7 @@
           });
         }
       }
-      return true;
+      return field;
     }
 
     function getTitleMap(editModes) {
@@ -345,14 +344,14 @@
         return _.filter(this.fieldRegister, (form, k) => {
           return re.test(k);
         });
-      } else {
+      } else if (this.fieldRegister[key]) {
         return [this.fieldRegister[key]];
-      }
+      } else return [];
     }
 
     function createDirtyCheck(field) {
       //let path = sfPath.parse(field.key);
-      let key = `__dirtyCheck["${field.key || batchConfig.key}"]`;
+      let key = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
       //let child = path.length > 1;
       let htmlClass = '';
 
@@ -612,6 +611,13 @@
       else if(mode === 'decrease') {
         update.set(_.subtract(original.get() || 0, val));
       }
+      else if(mode === 'stringReplace' && original.get()) {
+        let key = original.path().key;
+        let replaceString = cnFlexFormService.parseExpression(`_replace_${key}`, this.model);
+        let withString = cnFlexFormService.parseExpression(`_with_${key}`, this.model);
+        let expression = new RegExp(replaceString.get(), "gi");
+        update.set(original.get().replace(expression, withString.get()));
+      }
       /* This needs work, _.find(val, item) might not work because the
          the items we're comparing might have the same id but one might
          have different properties
@@ -634,7 +640,7 @@
     function processDefault(field) {
       let config = field.batchConfig;
 
-      config.editModes = config.editModes || ['replace', 'prepend', 'append'];
+      config.editModes = config.editModes || ['replace', 'prepend', 'append', 'stringReplace'];
 
       config.default = config.default || 'append';
 
@@ -656,8 +662,50 @@
         },
         prepend: () => {
           setPlaceholder(field, '');
+        },
+        stringReplace: () => {
         }
       };
+
+      if(config.editModes.includes('stringReplace')) {
+        let dirtyCheck = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
+        let configKey = `__batchConfig["${field.key || field.batchConfig.key}"]`;
+        let replaceKey = `_replace_${field.key || field.batchConfig.key}`;
+        let withKey = `_with_${field.key || field.batchConfig.key}`;
+        let stringReplaceField = {
+          type: 'component',
+          items: [
+          {
+            key: replaceKey,
+            title: 'Replace',
+            watch: {
+              resolution: `model.${dirtyCheck} = true`
+            }
+          }, {
+            key: withKey,
+            title: 'With',
+            watch: {
+              resolution: `model.${dirtyCheck} = true`
+            }
+          }],
+          condition: `model.${configKey} === 'stringReplace'`
+        };
+
+        config.key = field.key;
+
+        field = {
+          type: 'section',
+          condition: field.condition,
+          batchConfig: config,
+          schema: field.schema,
+          key: field.key,
+          items: [_.extend(field, {condition: `model.${configKey} !== 'stringReplace'`}), stringReplaceField]
+        };
+
+        this.addToSchema(replaceKey, { type: 'string' });
+        this.addToSchema(withKey, { type: 'string' });
+      }
+        return field;
     }
 
     function processNumber(field) {
@@ -671,6 +719,7 @@
       else {
         field.placeholder = '—';
       }
+      return field;
     }
 
     function setNestedPlaceholder(field) {
@@ -725,6 +774,7 @@
           setPlaceholder(field, '—');
         }
       }
+      return field;
     }
 
     function processDate(field) {
@@ -736,6 +786,7 @@
       else {
         setPlaceholder(field, '—');
       }
+      return field;
     }
 
     function processToggle(field) {
@@ -744,6 +795,7 @@
       if(_.allEqual(config.ogValues)) {
         cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
       }
+      return field;
     }
 
     function processSchema() {
