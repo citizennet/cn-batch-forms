@@ -82,7 +82,6 @@
         onReprocessField,
         processCondition,
         processSchema,
-        processForm,
         processField,
         processItems,
         processDate,
@@ -120,16 +119,15 @@
       if(schema.forms) {
         let i = schema.forms.length - 1;
         while(i > -1) {
-          this.processForm(schema.forms[i]);
+          this.processItems(schema.forms[i].form);
           if(!schema.forms[i].form.length) {
             schema.forms.splice(i, 1);
           }
           --i;
         }
-        //schema.forms.forEach(this.processForm.bind(this));
       }
       else {
-        this.processForm(schema.form);
+        this.processItems(schema.form);
       }
 
       this.addMeta();
@@ -158,22 +156,18 @@
 
     }
 
-    function processForm(form) {
-      this.processItems(form, 'form');
-    }
-
-    function processItems(field, children = 'items') {
+    function processItems(fields) {
       //console.log('processItems:', field, children);
-      let i = field[children].length - 1;
+      let i = fields.length - 1;
       while(i > -1) {
-        let child = this.processField(field[children][i]);
+        let child = this.processField(fields[i]);
         if(child && child.batchConfig) {
           //console.log('child:', child);
           child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
           let batchField = this.createBatchField(child);
           let dirtyCheck = child.key && this.createDirtyCheck(child);
           // add mode buttons after field
-          field[children][i] = {
+          fields[i] = {
             type: 'section',
             htmlClass: 'cn-batch-wrapper',
             items: dirtyCheck ? [child, dirtyCheck, batchField] : [child, batchField],
@@ -186,7 +180,7 @@
         }
         if(!child) {
           // remove field if batch isn't supported by it or children
-          field[children].splice(i, 1);
+          fields.splice(i, 1);
         }
         --i;
       }
@@ -197,13 +191,11 @@
     }
 
     function processField(field) {
-      //console.log('processField:', field.batchConfig, field);
       if(field.key) {
         if(!field.batchConfig) return false;
 
         field._key = field.key;
         field._placeholder = field.placeholder;
-        console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
 
@@ -234,7 +226,7 @@
             child.batchConfig = _.clone(field.batchConfig);
           });
         }
-        this.processItems(field);
+        this.processItems(field.items);
         if(!field.items.length) return false;
 
         if(field.batchConfig) {

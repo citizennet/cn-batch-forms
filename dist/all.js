@@ -183,7 +183,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         onReprocessField: onReprocessField,
         processCondition: processCondition,
         processSchema: processSchema,
-        processForm: processForm,
         processField: processField,
         processItems: processItems,
         processDate: processDate,
@@ -221,16 +220,15 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       if (schema.forms) {
         var i = schema.forms.length - 1;
         while (i > -1) {
-          this.processForm(schema.forms[i]);
+          this.processItems(schema.forms[i].form);
           if (!schema.forms[i].form.length) {
             schema.forms.splice(i, 1);
           }
           --i;
         }
-        //schema.forms.forEach(this.processForm.bind(this));
       } else {
-          this.processForm(schema.form);
-        }
+        this.processItems(schema.form);
+      }
 
       this.addMeta();
       this.processLinks();
@@ -257,24 +255,18 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         }
     }
 
-    function processForm(form) {
-      this.processItems(form, 'form');
-    }
-
-    function processItems(field) {
-      var children = arguments.length <= 1 || arguments[1] === undefined ? 'items' : arguments[1];
-
+    function processItems(fields) {
       //console.log('processItems:', field, children);
-      var i = field[children].length - 1;
+      var i = fields.length - 1;
       while (i > -1) {
-        var child = this.processField(field[children][i]);
+        var child = this.processField(fields[i]);
         if (child && child.batchConfig) {
           //console.log('child:', child);
           child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
           var batchField = this.createBatchField(child);
           var dirtyCheck = child.key && this.createDirtyCheck(child);
           // add mode buttons after field
-          field[children][i] = {
+          fields[i] = {
             type: 'section',
             htmlClass: 'cn-batch-wrapper',
             items: dirtyCheck ? [child, dirtyCheck, batchField] : [child, batchField],
@@ -287,7 +279,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         }
         if (!child) {
           // remove field if batch isn't supported by it or children
-          field[children].splice(i, 1);
+          fields.splice(i, 1);
         }
         --i;
       }
@@ -298,13 +290,11 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function processField(field) {
-      //console.log('processField:', field.batchConfig, field);
       if (field.key) {
         if (!field.batchConfig) return false;
 
         field._key = field.key;
         field._placeholder = field.placeholder;
-        console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
 
@@ -333,7 +323,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             child.batchConfig = _.clone(field.batchConfig);
           });
         }
-        this.processItems(field);
+        this.processItems(field.items);
         if (!field.items.length) return false;
 
         if (field.batchConfig) {
