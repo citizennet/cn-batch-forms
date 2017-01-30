@@ -38,9 +38,9 @@
           </p>
         </td>
         <td class="col-sm-2 text-center">
-          <a ng-show="result.editSref"
+          <a ng-show="vm.showEdit(vm.config, result)"
              class="btn btn-sm btn-transparent"
-             ui-sref="{{result.editSref}}">
+             ng-click="vm.handleEdit(vm.config, result)">
             <i class="icn-edit"></i>
           </a>
         </td>

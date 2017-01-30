@@ -19,14 +19,16 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     var vm = this;
     vm.parent = parent;
     vm.results = vm.parent.results;
-    //vm.errors = _.reject(vm.results, {status: 200});
     vm.originals = vm.parent.models;
     vm.config = vm.parent.resultsConfig;
     vm.displayName = vm.config && vm.config.displayName || 'name';
     vm.formName = $state.current.name;
+    vm.onEdit = vm.config && vm.config.onEdit;
     vm.text = vm.config.text;
 
     vm.activate = activate;
+    vm.handleEdit = handleEdit;
+    vm.showEdit = showEdit;
     vm.submit = submit;
 
     vm.activate();
@@ -34,15 +36,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     //////////
 
     function activate() {
-      console.log('vm.parent:', vm.parent);
-      if (vm.config.idParam) {
-        vm.results.forEach(function (result, i) {
-          var params = _.assign({}, $stateParams, _defineProperty({}, vm.config.idParam, vm.originals[i].id));
-          result.editSref = $state.current.name + '(' + angular.toJson(params) + ')';
-          console.log('result.editSref:', result);
-        });
-      }
-
       vm.headerConfig = {
         title: {
           main: 'Batch Results'
@@ -63,8 +56,20 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       };
     }
 
+    function handleEdit(config, result) {
+      if (_.isFunction(vm.onEdit)) {
+        vm.onEdit(result.body);
+      } else {
+        var params = _.assign({}, $stateParams, _defineProperty({}, config.idParam, result.body.id));
+        $state.go($state.current.name, params);
+      }
+    }
+
+    function showEdit(config, result) {
+      return config.idParam && _.inRange(result.status, 200, 299);
+    }
+
     function submit(handler) {
-      console.log('submit:', handler);
       vm.parent.closeModal();
       if (handler) {
         handler();
@@ -110,7 +115,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 })();
 'use strict';
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
@@ -547,8 +552,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             console.error('noRegister:', key);
             return;
           }
-          var field = register.field;
-          var dirtyCheck = register.dirtyCheck;
+          var field = register.field,
+              dirtyCheck = register.dirtyCheck;
 
           var handler = _this6.handleLinks(_.without(keys, key), hard);
           field.watch = field.watch || [];
@@ -1018,5 +1023,5 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 "use strict";
 
 angular.module("cn.batch-forms").run(["$templateCache", function ($templateCache) {
-  $templateCache.put("cn-batch-forms/batch-results.html", "<div class=\"cn-modal\">\n  <div class=\"modal-header clearfix\">\n    <cn-flex-form-header\n      ff-header-config=\"vm.headerConfig\"\n      ff-submit=\"vm.submit(handler)\">\n    </cn-flex-form-header>\n  </div>\n  <div class=\"modal-body cn-list card-flex\"\n       cn-responsive-height=\"80\"\n       cn-responsive-break=\"sm\"\n       cn-set-max-height>\n\n    <div class=\"padding-20\"\n         ng-if=\"vm.text\">\n      <p class=\"no-margin text-mute\"\n         ng-bind-html=\"vm.text\">\n      </p>\n    </div>\n\n    <table class=\"table gutterless\">\n      <tbody>\n      <tr ng-repeat=\"result in vm.results\">\n        <td class=\"col-sm-10\">\n          <h6 ng-show=\"result.status == 200\">\n            {{result.body[vm.displayName]}}\n            <span class=\"text-mute\">({{result.body.id}})</span>\n          </h6>\n          <h6 ng-show=\"result.status != 200\">\n            {{vm.originals[$index][vm.displayName]}}\n            <span class=\"text-mute\">({{vm.originals[$index].id}})</span>\n          </h6>\n          <p ng-class=\"{\n               \'text-danger\': result.status != 200,\n               \'text-primary\': result.status == 200\n             }\">\n            <i class=\"fa fa-{{result.status == 200 ? \'check\' : \'times\'}}\"></i>\n            {{result.status == 200 ? \'updated successfully\' : result.body.message}}\n          </p>\n        </td>\n        <td class=\"col-sm-2 text-center\">\n          <a ng-show=\"result.editSref\"\n             class=\"btn btn-sm btn-transparent\"\n             ui-sref=\"{{result.editSref}}\">\n            <i class=\"icn-edit\"></i>\n          </a>\n        </td>\n      </tr>\n      </tbody>\n    </table>\n  </div>\n</div>\n");
+  $templateCache.put("cn-batch-forms/batch-results.html", "<div class=\"cn-modal\">\n  <div class=\"modal-header clearfix\">\n    <cn-flex-form-header\n      ff-header-config=\"vm.headerConfig\"\n      ff-submit=\"vm.submit(handler)\">\n    </cn-flex-form-header>\n  </div>\n  <div class=\"modal-body cn-list card-flex\"\n       cn-responsive-height=\"80\"\n       cn-responsive-break=\"sm\"\n       cn-set-max-height>\n\n    <div class=\"padding-20\"\n         ng-if=\"vm.text\">\n      <p class=\"no-margin text-mute\"\n         ng-bind-html=\"vm.text\">\n      </p>\n    </div>\n\n    <table class=\"table gutterless\">\n      <tbody>\n      <tr ng-repeat=\"result in vm.results\">\n        <td class=\"col-sm-10\">\n          <h6 ng-show=\"result.status == 200\">\n            {{result.body[vm.displayName]}}\n            <span class=\"text-mute\">({{result.body.id}})</span>\n          </h6>\n          <h6 ng-show=\"result.status != 200\">\n            {{vm.originals[$index][vm.displayName]}}\n            <span class=\"text-mute\">({{vm.originals[$index].id}})</span>\n          </h6>\n          <p ng-class=\"{\n               \'text-danger\': result.status != 200,\n               \'text-primary\': result.status == 200\n             }\">\n            <i class=\"fa fa-{{result.status == 200 ? \'check\' : \'times\'}}\"></i>\n            {{result.status == 200 ? \'updated successfully\' : result.body.message}}\n          </p>\n        </td>\n        <td class=\"col-sm-2 text-center\">\n          <a ng-show=\"vm.showEdit(vm.config, result)\"\n             class=\"btn btn-sm btn-transparent\"\n             ng-click=\"vm.handleEdit(vm.config, result)\">\n            <i class=\"icn-edit\"></i>\n          </a>\n        </td>\n      </tr>\n      </tbody>\n    </table>\n  </div>\n</div>\n");
 }]);
