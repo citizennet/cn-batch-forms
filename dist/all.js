@@ -278,9 +278,11 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             condition: this.processCondition(child.condition)
           };
           delete child.condition;
-          if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
-          this.fieldRegister[child.key].field = child;
-          this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
+          if (child.key) {
+            if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
+            this.fieldRegister[child.key].field = child;
+            this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
+          }
         }
         if (!child) {
           // remove field if batch isn't supported by it or children
