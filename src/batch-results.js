@@ -16,11 +16,9 @@
     vm.config = vm.parent.resultsConfig;
     vm.displayName = vm.config && vm.config.displayName || 'name';
     vm.formName = $state.current.name;
-    vm.onEdit  = vm.config && vm.config.onEdit;
     vm.text = vm.config.text;
 
     vm.activate = activate;
-    vm.handleEdit = handleEdit;
     vm.showEdit = showEdit;
     vm.submit = submit;
 
@@ -29,6 +27,18 @@
     //////////
 
     function activate() {
+      if (vm.config.idParam) {
+        vm.results.forEach((result, index) => {
+          if (typeof vm.config.buildEditSref === 'function') {
+            result.editSref = vm.config.buildEditSref(result.body, index);
+          }
+          else {
+            const params = _.assign({}, $stateParams, {[vm.config.idParam]: vm.originals[i].id});
+            result.editSref = `${$state.current.name}(${angular.toJson(params)})`;
+          }
+        });
+      }
+
       vm.headerConfig = {
         title: {
           main: 'Batch Results'
@@ -50,18 +60,8 @@
 
     }
 
-    function handleEdit(config, result) {
-      if (_.isFunction(vm.onEdit)) {
-        vm.onEdit(result.body);
-      }
-      else {
-        const params = _.assign({}, $stateParams, { [config.idParam]: result.body.id });
-        $state.go($state.current.name, params);
-      }
-    }
-
-    function showEdit(config, result) {
-      return config.idParam && _.inRange(result.status, 200, 299);
+    function showEdit(result) {
+      return result.editSref && _.inRange(result.status, 200, 299);
     }
 
     function submit(handler) {
