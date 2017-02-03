@@ -771,7 +771,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       };
 
       if (config.editModes.includes('stringReplace')) {
-        var dirtyCheck = '__dirtyCheck["' + (field.key || field.batchConfig.key) + '"]';
+        var dirtyCheck = this.createDirtyCheck(field);
         var configKey = '__batchConfig["' + (field.key || field.batchConfig.key) + '"]';
         var replaceKey = '_replace_' + (field.key || field.batchConfig.key);
         var withKey = '_with_' + (field.key || field.batchConfig.key);
@@ -781,13 +781,13 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             key: replaceKey,
             title: 'Replace',
             watch: {
-              resolution: 'model.' + dirtyCheck + ' = true'
+              resolution: 'model.' + dirtyCheck.key + ' = true'
             }
           }, {
             key: withKey,
             title: 'With',
             watch: {
-              resolution: 'model.' + dirtyCheck + ' = true'
+              resolution: 'model.' + dirtyCheck.key + ' = true'
             }
           }],
           condition: 'model.' + configKey + ' === \'stringReplace\''
@@ -795,18 +795,18 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
         config.key = field.key;
 
-        field = {
+        this.addToSchema(replaceKey, { type: 'string' });
+        this.addToSchema(withKey, { type: 'string' });
+
+        return {
           type: 'section',
           condition: field.condition,
           batchConfig: config,
           schema: field.schema,
-          key: field.key,
-          items: [_.extend(field, { condition: 'model.' + configKey + ' !== \'stringReplace\'' }), stringReplaceField]
+          items: [_.extend(field, { condition: 'model.' + configKey + ' !== \'stringReplace\'' }), stringReplaceField, dirtyCheck]
         };
-
-        this.addToSchema(replaceKey, { type: 'string' });
-        this.addToSchema(withKey, { type: 'string' });
       }
+
       return field;
     }
 

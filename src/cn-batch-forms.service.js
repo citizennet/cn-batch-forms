@@ -160,7 +160,7 @@
       //console.log('processItems:', field, children);
       let i = fields.length - 1;
       while(i > -1) {
-        let child = this.processField(fields[i]);
+        const child = this.processField(fields[i]);
         if(child && child.batchConfig) {
           //console.log('child:', child);
           child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
@@ -662,7 +662,7 @@
       };
 
       if(config.editModes.includes('stringReplace')) {
-        let dirtyCheck = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
+        const dirtyCheck = this.createDirtyCheck(field);
         let configKey = `__batchConfig["${field.key || field.batchConfig.key}"]`;
         let replaceKey = `_replace_${field.key || field.batchConfig.key}`;
         let withKey = `_with_${field.key || field.batchConfig.key}`;
@@ -673,13 +673,13 @@
             key: replaceKey,
             title: 'Replace',
             watch: {
-              resolution: `model.${dirtyCheck} = true`
+              resolution: `model.${dirtyCheck.key} = true`
             }
           }, {
             key: withKey,
             title: 'With',
             watch: {
-              resolution: `model.${dirtyCheck} = true`
+              resolution: `model.${dirtyCheck.key} = true`
             }
           }],
           condition: `model.${configKey} === 'stringReplace'`
@@ -687,19 +687,20 @@
 
         config.key = field.key;
 
-        field = {
+        this.addToSchema(replaceKey, { type: 'string' });
+        this.addToSchema(withKey, { type: 'string' });
+
+
+        return {
           type: 'section',
           condition: field.condition,
           batchConfig: config,
           schema: field.schema,
-          key: field.key,
-          items: [_.extend(field, {condition: `model.${configKey} !== 'stringReplace'`}), stringReplaceField]
+          items: [_.extend(field, {condition: `model.${configKey} !== 'stringReplace'`}), stringReplaceField, dirtyCheck]
         };
-
-        this.addToSchema(replaceKey, { type: 'string' });
-        this.addToSchema(withKey, { type: 'string' });
       }
-        return field;
+
+      return field;
     }
 
     function processNumber(field) {
