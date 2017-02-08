@@ -36,7 +36,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function activate() {
       if (vm.config.idParam) {
         vm.results.forEach(function (result, index) {
-          if (typeof vm.config.buildEditSref === 'function') {
+          if (_.isFunction(vm.config.buildEditSref)) {
             result.editSref = vm.config.buildEditSref(result.body, index);
           } else {
             var params = _.assign({}, $stateParams, _defineProperty({}, vm.config.idParam, vm.originals[i].id));
