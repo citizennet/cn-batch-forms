@@ -29,7 +29,7 @@
     function activate() {
       if (vm.config.idParam) {
         vm.results.forEach((result, index) => {
-          if (typeof vm.config.buildEditSref === 'function') {
+          if (_.isFunction(vm.config.buildEditSref)) {
             result.editSref = vm.config.buildEditSref(result.body, index);
           }
           else {
