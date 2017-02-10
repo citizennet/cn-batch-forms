@@ -12,7 +12,6 @@
     var vm = this;
     vm.parent = parent;
     vm.results = vm.parent.results;
-    //vm.errors = _.reject(vm.results, {status: 200});
     vm.originals = vm.parent.models;
     vm.config = vm.parent.resultsConfig;
     vm.displayName = vm.config && vm.config.displayName || 'name';
@@ -20,6 +19,7 @@
     vm.text = vm.config.text;
 
     vm.activate = activate;
+    vm.showEdit = showEdit;
     vm.submit = submit;
 
     vm.activate();
@@ -27,12 +27,15 @@
     //////////
 
     function activate() {
-      console.log('vm.parent:', vm.parent);
-      if(vm.config.idParam) {
-        vm.results.forEach((result, i) => {
-          let params = _.assign({}, $stateParams, {[vm.config.idParam]: vm.originals[i].id});
-          result.editSref = `${$state.current.name}(${angular.toJson(params)})`;
-          console.log('result.editSref:', result);
+      if (vm.config.idParam) {
+        vm.results.forEach((result, index) => {
+          if (_.isFunction(vm.config.buildEditSref)) {
+            result.editSref = vm.config.buildEditSref(result.body, index);
+          }
+          else {
+            const params = _.assign({}, $stateParams, {[vm.config.idParam]: vm.originals[i].id});
+            result.editSref = `${$state.current.name}(${angular.toJson(params)})`;
+          }
         });
       }
 
@@ -57,8 +60,11 @@
 
     }
 
+    function showEdit(result) {
+      return result.editSref && _.inRange(result.status, 200, 299);
+    }
+
     function submit(handler) {
-      console.log('submit:', handler);
       vm.parent.closeModal();
       if(handler) {
         handler();
