@@ -245,6 +245,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
     function onFieldScope(event, scope) {
       var key = cnFlexFormService.getKey(scope.form.key);
+
       //console.log('onFieldScope:', key, scope.form.key, scope);
       if (!key.startsWith('__')) {
         if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
@@ -306,7 +307,6 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
         field._key = field.key;
         field._placeholder = field.placeholder;
-        console.log('field._placeholder:', field._placeholder);
         field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
         field.type = field.type || field.schema.type;
 
