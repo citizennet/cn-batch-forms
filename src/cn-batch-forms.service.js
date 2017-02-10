@@ -419,7 +419,9 @@
 
     function onReprocessField(e, key) {
       let register = this.fieldRegister[key];
-      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
+      if (register) {
+        this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
+      }
     }
 
     function handleLinks(list, hard) {
