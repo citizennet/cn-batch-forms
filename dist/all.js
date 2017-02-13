@@ -39,7 +39,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           if (_.isFunction(vm.config.buildEditSref)) {
             result.editSref = vm.config.buildEditSref(result.body, index);
           } else {
-            var params = _.assign({}, $stateParams, _defineProperty({}, vm.config.idParam, vm.originals[i].id));
+            var params = _.assign({}, $stateParams, _defineProperty({}, vm.config.idParam, vm.originals[index].id));
             result.editSref = $state.current.name + '(' + angular.toJson(params) + ')';
           }
         });
@@ -115,9 +115,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 })();
 'use strict';
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
 
 (function () {
   angular.module('cn.batch-forms').provider('cnBatchForms', cnBatchFormsProvider);
@@ -443,14 +443,14 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var _this3 = this;
 
       if (key.includes('[]')) {
-        var _ret = function () {
+        var _ret = (function () {
           var re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
           return {
             v: _.filter(_this3.fieldRegister, function (form, k) {
               return re.test(k);
             })
           };
-        }();
+        })();
 
         if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
       } else if (this.fieldRegister[key]) {
@@ -555,8 +555,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             console.error('noRegister:', key);
             return;
           }
-          var field = register.field,
-              dirtyCheck = register.dirtyCheck;
+          var field = register.field;
+          var dirtyCheck = register.dirtyCheck;
 
           var handler = _this6.handleLinks(_.without(keys, key), hard);
           field.watch = field.watch || [];
@@ -585,7 +585,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
     function buildModelDefault(key, schema) {
       if (schema.type === 'array') {
-        var _ret2 = function () {
+        var _ret2 = (function () {
           var model = _defineProperty({}, key, []);
           if (schema.items) {
             _.each(schema.items.properties, function (v, k) {
@@ -597,7 +597,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           return {
             v: model
           };
-        }();
+        })();
 
         if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
       }
@@ -672,12 +672,12 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
             cnFlexFormService.parseExpression(assignable.fullPath, _this7.models[i]).set(val);
           } else {
-            var _val = cnFlexFormService.parseExpression(key, _this7.model).get();
+            var val = cnFlexFormService.parseExpression(key, _this7.model).get();
             var update = cnFlexFormService.parseExpression(key, models[i]);
             var original = cnFlexFormService.parseExpression(key, _this7.models[i]);
 
             //console.log('val, update, original:', val, update.get(), original.get(), key);
-            _this7.setValue(_val, update, original, mode);
+            _this7.setValue(val, update, original, mode);
           }
         });
       });
@@ -703,11 +703,11 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           update.set(val);
         }
       } else if (mode === 'prepend') {
-        var _originalVal = original.get();
-        if (_.isArray(_originalVal)) {
-          update.set(val.concat(_originalVal));
-        } else if (_.isString(_originalVal)) {
-          update.set(val.trim() + ' ' + _originalVal);
+        var originalVal = original.get();
+        if (_.isArray(originalVal)) {
+          update.set(val.concat(originalVal));
+        } else if (_.isString(originalVal)) {
+          update.set(val.trim() + ' ' + originalVal);
         } else {
           update.set(val);
         }
