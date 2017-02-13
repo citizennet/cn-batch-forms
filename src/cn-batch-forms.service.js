@@ -143,6 +143,7 @@
 
     function onFieldScope(event, scope) {
       let key = cnFlexFormService.getKey(scope.form.key);
+
       //console.log('onFieldScope:', key, scope.form.key, scope);
       if(!key.startsWith('__')) {
         if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
@@ -153,7 +154,6 @@
       else if(scope.form.key[0] === '__batchConfig') {
         scope.ngModel.$pristine = false;
       }
-
     }
 
     function processItems(fields) {
