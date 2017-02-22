@@ -609,7 +609,7 @@
         let key = original.path().key;
         let replaceString = cnFlexFormService.parseExpression(`_replace_${key}`, this.model);
         let withString = cnFlexFormService.parseExpression(`_with_${key}`, this.model);
-        let expression = new RegExp(replaceString.get(), "gi");
+        let expression = new RegExp(_.escapeRegExp(replaceString.get()), "gi");
         update.set(original.get().replace(expression, withString.get()));
       }
       /* This needs work, _.find(val, item) might not work because the

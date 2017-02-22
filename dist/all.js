@@ -115,9 +115,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 })();
 'use strict';
 
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
 
-function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.constructor === Symbol ? "symbol" : typeof obj; }
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
 (function () {
   angular.module('cn.batch-forms').provider('cnBatchForms', cnBatchFormsProvider);
@@ -443,14 +443,14 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
       var _this3 = this;
 
       if (key.includes('[]')) {
-        var _ret = (function () {
+        var _ret = function () {
           var re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
           return {
             v: _.filter(_this3.fieldRegister, function (form, k) {
               return re.test(k);
             })
           };
-        })();
+        }();
 
         if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
       } else if (this.fieldRegister[key]) {
@@ -585,7 +585,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
     function buildModelDefault(key, schema) {
       if (schema.type === 'array') {
-        var _ret2 = (function () {
+        var _ret2 = function () {
           var model = _defineProperty({}, key, []);
           if (schema.items) {
             _.each(schema.items.properties, function (v, k) {
@@ -597,7 +597,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
           return {
             v: model
           };
-        })();
+        }();
 
         if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
       }
@@ -672,12 +672,12 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
 
             cnFlexFormService.parseExpression(assignable.fullPath, _this7.models[i]).set(val);
           } else {
-            var val = cnFlexFormService.parseExpression(key, _this7.model).get();
+            var _val = cnFlexFormService.parseExpression(key, _this7.model).get();
             var update = cnFlexFormService.parseExpression(key, models[i]);
             var original = cnFlexFormService.parseExpression(key, _this7.models[i]);
 
             //console.log('val, update, original:', val, update.get(), original.get(), key);
-            _this7.setValue(val, update, original, mode);
+            _this7.setValue(_val, update, original, mode);
           }
         });
       });
@@ -703,11 +703,11 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
           update.set(val);
         }
       } else if (mode === 'prepend') {
-        var originalVal = original.get();
-        if (_.isArray(originalVal)) {
-          update.set(val.concat(originalVal));
-        } else if (_.isString(originalVal)) {
-          update.set(val.trim() + ' ' + originalVal);
+        var _originalVal = original.get();
+        if (_.isArray(_originalVal)) {
+          update.set(val.concat(_originalVal));
+        } else if (_.isString(_originalVal)) {
+          update.set(val.trim() + ' ' + _originalVal);
         } else {
           update.set(val);
         }
@@ -719,7 +719,7 @@ function _typeof(obj) { return obj && typeof Symbol !== "undefined" && obj.const
         var key = original.path().key;
         var replaceString = cnFlexFormService.parseExpression('_replace_' + key, this.model);
         var withString = cnFlexFormService.parseExpression('_with_' + key, this.model);
-        var expression = new RegExp(replaceString.get(), "gi");
+        var expression = new RegExp(_.escapeRegExp(replaceString.get()), "gi");
         update.set(original.get().replace(expression, withString.get()));
       }
       /* This needs work, _.find(val, item) might not work because the
