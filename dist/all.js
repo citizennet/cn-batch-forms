@@ -254,7 +254,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
         this.fieldRegister[key].ngModel = scope.ngModel;
         this.fieldRegister[key].scope = scope;
+
+        if (!this.fieldRegister[key].field) this.fieldRegister[key].field = scope.form;
       }
+
       // prevent edit mode radiobuttons from setting form to dirty
       else if (scope.form.key[0] === '__batchConfig') {
           scope.ngModel.$pristine = false;
@@ -325,7 +328,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
           return handler.bind(this)(field);
         } else return false;
-      } else if (field.items) {
+      }
+
+      if (field.items) {
         if (field.batchConfig) {
           field.items.forEach(function (child) {
             child.batchConfig = _.clone(field.batchConfig);
@@ -492,6 +497,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
       dirtyCheck.fieldWatch = {
         resolution: function resolution(val) {
+          console.log(':: val  ::', field._key, val, model[field._key]);
           if (!angular.equals(val, model[field._key])) {
             var register = _this4.fieldRegister[field._key];
             if (register) {
@@ -504,7 +510,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             }
             // debug
             else {
-                console.log('noregister:', field, _this4.fieldRegister);
+                console.debug('noregister:', field, _this4.fieldRegister);
               }
           }
         }
@@ -530,6 +536,11 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       if (register) {
         this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
       }
+      if (!register) {
+        return console.debug('noRegister:', key, this.fieldRegister);
+      }
+
+      if (register.dirtyCheck) this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
     function handleLinks(list, hard) {

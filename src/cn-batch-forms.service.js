@@ -149,7 +149,10 @@
         if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
         this.fieldRegister[key].ngModel = scope.ngModel;
         this.fieldRegister[key].scope = scope;
+
+        if(!this.fieldRegister[key].field) this.fieldRegister[key].field = scope.form;
       }
+
       // prevent edit mode radiobuttons from setting form to dirty
       else if(scope.form.key[0] === '__batchConfig') {
         scope.ngModel.$pristine = false;
@@ -222,7 +225,8 @@
         }
         else return false;
       }
-      else if(field.items) {
+
+      if (field.items) {
         if(field.batchConfig) {
           field.items.forEach(child => {
             child.batchConfig = _.clone(field.batchConfig);
@@ -375,6 +379,7 @@
 
       dirtyCheck.fieldWatch = {
         resolution: val => {
+          console.log(':: val  ::', field._key, val, model[field._key]);
           if(!angular.equals(val, model[field._key])) {
             let register = this.fieldRegister[field._key];
             if(register) {
@@ -388,7 +393,7 @@
             }
             // debug
             else {
-              console.log('noregister:', field, this.fieldRegister);
+              console.debug('noregister:', field, this.fieldRegister);
             }
           }
         }
@@ -415,6 +420,11 @@
       if (register) {
         this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
       }
+      if(!register) {
+        return console.debug('noRegister:', key, this.fieldRegister);
+      }
+
+      if(register.dirtyCheck) this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
     function handleLinks(list, hard) {
