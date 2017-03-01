@@ -33,7 +33,7 @@
             result.editSref = vm.config.buildEditSref(result.body, index);
           }
           else {
-            const params = _.assign({}, $stateParams, {[vm.config.idParam]: vm.originals[i].id});
+            const params = _.assign({}, $stateParams, {[vm.config.idParam]: vm.originals[index].id});
             result.editSref = `${$state.current.name}(${angular.toJson(params)})`;
           }
         });

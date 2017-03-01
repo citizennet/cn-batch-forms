@@ -39,7 +39,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
           if (_.isFunction(vm.config.buildEditSref)) {
             result.editSref = vm.config.buildEditSref(result.body, index);
           } else {
-            var params = _.assign({}, $stateParams, _defineProperty({}, vm.config.idParam, vm.originals[i].id));
+            var params = _.assign({}, $stateParams, _defineProperty({}, vm.config.idParam, vm.originals[index].id));
             result.editSref = $state.current.name + '(' + angular.toJson(params) + ')';
           }
         });
@@ -270,8 +270,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       while (i > -1) {
         var child = this.processField(fields[i]);
         if (child && child.batchConfig) {
-          //console.log('child:', child);
-          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
+          if (child.type !== 'fieldset') {
+            child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
+          }
           var batchField = this.createBatchField(child);
           var dirtyCheck = child.key && this.createDirtyCheck(child);
           // add mode buttons after field
@@ -533,13 +534,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
     function onReprocessField(e, key) {
       var register = this.fieldRegister[key];
-      if (register) {
-        this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
-      }
-      if (!register) {
-        return console.debug('noRegister:', key, this.fieldRegister);
-      }
-
+      if (!register) return console.debug('noRegister:', key, this.fieldRegister);
+      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
       if (register.dirtyCheck) this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
@@ -732,7 +728,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         var key = original.path().key;
         var replaceString = cnFlexFormService.parseExpression('_replace_' + key, this.model);
         var withString = cnFlexFormService.parseExpression('_with_' + key, this.model);
-        var expression = new RegExp(replaceString.get(), "gi");
+        var expression = new RegExp(_.escapeRegExp(replaceString.get()), "gi");
         update.set(original.get().replace(expression, withString.get()));
       }
       /* This needs work, _.find(val, item) might not work because the
@@ -857,7 +853,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         config.default = config.default || 'replace';
 
         if (_.allEqual(config.ogValues)) {
-          cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
+          // fucking angular infdigs
+          $timeout(function () {
+            return cnFlexFormService.parseExpression(field.key, _this9.model).set(_.first(angular.copy(config.ogValues)));
+          });
         } else {
           setNestedPlaceholder(field);
         }

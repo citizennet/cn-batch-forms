@@ -165,8 +165,9 @@
       while(i > -1) {
         const child = this.processField(fields[i]);
         if(child && child.batchConfig) {
-          //console.log('child:', child);
-          child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
+          if(child.type !== 'fieldset') {
+            child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
+          }
           let batchField = this.createBatchField(child);
           let dirtyCheck = child.key && this.createDirtyCheck(child);
           // add mode buttons after field
@@ -417,13 +418,8 @@
 
     function onReprocessField(e, key) {
       let register = this.fieldRegister[key];
-      if (register) {
-        this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
-      }
-      if(!register) {
-        return console.debug('noRegister:', key, this.fieldRegister);
-      }
-
+      if(!register) return console.debug('noRegister:', key, this.fieldRegister);
+      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
       if(register.dirtyCheck) this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
@@ -621,7 +617,7 @@
         let key = original.path().key;
         let replaceString = cnFlexFormService.parseExpression(`_replace_${key}`, this.model);
         let withString = cnFlexFormService.parseExpression(`_with_${key}`, this.model);
-        let expression = new RegExp(replaceString.get(), "gi");
+        let expression = new RegExp(_.escapeRegExp(replaceString.get()), "gi");
         update.set(original.get().replace(expression, withString.get()));
       }
       /* This needs work, _.find(val, item) might not work because the
@@ -747,7 +743,10 @@
         config.default = config.default || 'replace';
 
         if (_.allEqual(config.ogValues)) {
-          cnFlexFormService.parseExpression(field.key, this.model).set(_.first(config.ogValues));
+          // fucking angular infdigs
+          $timeout(() =>
+            cnFlexFormService.parseExpression(field.key, this.model).set(_.first(angular.copy(config.ogValues)))
+          );
         } else {
           setNestedPlaceholder(field);
         }
