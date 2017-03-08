@@ -207,7 +207,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function constructor(schema, model, models) {
-      console.log('BatchForms:', schema, model, models);
+      console.info('BatchForms:', schema, model, models);
 
       this.instance = instances;
       //cnFlexFormModalLoaderService.resolveMapping('results', this.instance, this);
@@ -241,7 +241,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
       $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
-      console.log('BatchDone:', schema, model, models);
+      console.info('BatchDone:', schema, model, models);
 
       return this;
     }
@@ -249,7 +249,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function onFieldScope(event, scope) {
       var key = cnFlexFormService.getKey(scope.form.key);
 
-      //console.log('onFieldScope:', key, scope.form.key, scope);
       if (!key.startsWith('__')) {
         if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
         this.fieldRegister[key].ngModel = scope.ngModel;
@@ -265,7 +264,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function processItems(fields) {
-      //console.log('processItems:', field, children);
       var i = fields.length - 1;
       while (i > -1) {
         var child = this.processField(fields[i]);
@@ -498,12 +496,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
       dirtyCheck.fieldWatch = {
         resolution: function resolution(val) {
-          console.log(':: val  ::', field._key, val, model[field._key]);
           if (!angular.equals(val, model[field._key])) {
             var register = _this4.fieldRegister[field._key];
             if (register) {
               if (register.ngModel && register.ngModel.$dirty || register.initiated) {
-                //console.log('dirtyCheck.key:', key);
                 cnFlexFormService.parseExpression(key, _this4.model).set(true);
               } else {
                 register.initiated = true;
@@ -535,7 +531,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function onReprocessField(e, key) {
       var register = this.fieldRegister[key];
       if (!register) return console.debug('noRegister:', key, this.fieldRegister);
-      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
+      _.get(register, 'dirtyCheck.fieldWatch') && this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
       if (register.dirtyCheck) this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
@@ -543,7 +539,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var _this5 = this;
 
       return function (val) {
-        //console.log('val:', list);
         list.forEach(function (key) {
           if (!hard) {
             var register = _this5.fieldRegister[key];
@@ -581,7 +576,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function processLinks() {
-      console.log('this.schema.batchConfig:', this.schema.batchConfig);
+      console.info('this.schema.batchConfig:', this.schema.batchConfig);
       if (this.schema.batchConfig) {
         if (this.schema.batchConfig.links) {
           this.processLinkList(this.schema.batchConfig.links);
@@ -685,13 +680,11 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             var update = cnFlexFormService.parseExpression(key, models[i]);
             var original = cnFlexFormService.parseExpression(key, _this7.models[i]);
 
-            //console.log('val, update, original:', val, update.get(), original.get(), key);
             _this7.setValue(_val, update, original, mode);
           }
         });
       });
 
-      //console.log('models:', models);
       return models;
     }
 
@@ -917,7 +910,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
       this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
-      console.log('this.defaults:', this.defaults);
+      console.info('this.defaults:', this.defaults);
 
       this.schema.schema.properties.__batchConfig = {
         type: 'object',
