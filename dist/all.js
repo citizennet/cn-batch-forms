@@ -695,9 +695,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     }
 
     function setPlaceholder(field, val) {
-      if (!field.noBatchPlaceholder) {
-        field._placeholder = val;
-      }
+      if (field.noBatchPlaceholder) return;
+      field.placeholder = val;
     }
 
     function processDefault(field) {
@@ -729,6 +728,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         },
         stringReplace: function stringReplace() {}
       };
+
+      if (config.editModes.includes(config.default)) {
+        config.onSelect[config.default]();
+      }
 
       if (config.editModes.includes('stringReplace')) {
         var dirtyCheck = this.createDirtyCheck(field);
@@ -785,10 +788,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
     function setNestedPlaceholder(field) {
       if (field.items) {
-        field.items.forEach(setNestedPlaceholder);
+        //field.items.forEach(setNestedPlaceholder);
       } else {
-        setPlaceholder(field, '—');
-      }
+          setPlaceholder(field, '—');
+        }
     }
 
     function processSelect(field) {
@@ -896,10 +899,17 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             var key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
             item.schema.default = _this10.defaults[key];
           }
-          item.placeholder = item._placeholder;
-          item.noBatchPlaceholder = true;
         }
         _this10.restoreDefaults(item);
+      });
+      setNoPlaceholder(form.items);
+    }
+
+    function setNoPlaceholder(items) {
+      _.each(items, function (item) {
+        item.placeholder = item._placeholder;
+        item.noBatchPlaceholder = true;
+        if (item.items) setNoPlaceholder(item.items);
       });
     }
 

@@ -141,7 +141,7 @@
       let key = cnFlexFormService.getKey(scope.form.key);
 
       if(!key.startsWith('__')) {
-        if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
+        if(!this.fieldRegister[key]) this.fieldRegister[key] = {};
         const register = this.fieldRegister[key];
         register.ngModel = scope.ngModel;
         register.scope = scope;
@@ -174,7 +174,7 @@
           };
           delete child.condition;
           if(child.key) {
-            if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
+            if(!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
             this.fieldRegister[child.key].field = child;
             this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
           }
@@ -222,7 +222,7 @@
         else return false;
       }
 
-      if (field.items) {
+      if(field.items) {
         if(field.batchConfig) {
           field.items.forEach(child => {
             child.batchConfig = _.clone(field.batchConfig);
@@ -306,8 +306,8 @@
     function setValidation(field, val) {
       let key = cnFlexFormService.getKey(field.key);
 
-      if (field.schema && field.schema.type === 'array') {
-        if (_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
+      if(field.schema && field.schema.type === 'array') {
+        if(_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
         field.schema.minItems = val ? field.schema._minItems : 0;
       }
 
@@ -327,18 +327,19 @@
               });
         }
       });
-      if (field.items) {
+      if(field.items) {
         field.items.forEach(i => this.setValidation(i, val));
       }
     }
 
     function getFormFromRegister(key) {
-      if (key.includes('[]')) {
+      if(key.includes('[]')) {
         let re = new RegExp(key.replace('[]', '\\[\\d*\\]'));
         return _.filter(this.fieldRegister, (form, k) => {
           return re.test(k);
         });
-      } else if (this.fieldRegister[key]) {
+      }
+      else if(this.fieldRegister[key]) {
         return [this.fieldRegister[key]];
       } else return [];
     }
@@ -547,7 +548,7 @@
       }
       else if(mode === 'append') {
         let originalVal = original.get();
-        if (_.isArray(originalVal)) {
+        if(_.isArray(originalVal)) {
           const uniqVal = _([])
             .concat(originalVal, val)
             .uniq((value) => value.key || value)
@@ -601,9 +602,8 @@
     }
 
     function setPlaceholder(field, val) {
-      if(!field.noBatchPlaceholder) {
-        field._placeholder = val;
-      }
+      if(field.noBatchPlaceholder) return;
+      field.placeholder = val;
     }
 
     function processDefault(field) {
@@ -632,9 +632,12 @@
         prepend: () => {
           setPlaceholder(field, '');
         },
-        stringReplace: () => {
-        }
+        stringReplace: () => {}
       };
+
+      if(config.editModes.includes(config.default)) {
+        config.onSelect[config.default]();
+      }
 
       if(config.editModes.includes('stringReplace')) {
         const dirtyCheck = this.createDirtyCheck(field);
@@ -693,9 +696,10 @@
     }
 
     function setNestedPlaceholder(field) {
-      if (field.items) {
-        field.items.forEach(setNestedPlaceholder);
-      } else {
+      if(field.items) {
+        //field.items.forEach(setNestedPlaceholder);
+      }
+      else {
         setPlaceholder(field, '—');
       }
     }
@@ -709,12 +713,13 @@
 
         config.default = config.default || 'replace';
 
-        if (_.allEqual(config.ogValues)) {
+        if(_.allEqual(config.ogValues)) {
           // fucking angular infdigs
           $timeout(() =>
             cnFlexFormService.parseExpression(field.key, this.model).set(_.first(angular.copy(config.ogValues)), { silent: true })
           );
-        } else {
+        }
+        else {
           setNestedPlaceholder(field);
         }
 
@@ -797,10 +802,17 @@
             let key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
             item.schema.default = this.defaults[key];
           }
-          item.placeholder = item._placeholder;
-          item.noBatchPlaceholder = true;
         }
         this.restoreDefaults(item);
+      });
+      setNoPlaceholder(form.items);
+    }
+
+    function setNoPlaceholder(items) {
+      _.each(items, (item) => {
+        item.placeholder = item._placeholder;
+        item.noBatchPlaceholder = true;
+        if(item.items) setNoPlaceholder(item.items);
       });
     }
 
