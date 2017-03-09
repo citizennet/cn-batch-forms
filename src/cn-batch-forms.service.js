@@ -101,7 +101,7 @@
     }
 
     function constructor(schema, model, models) {
-      console.log('BatchForms:', schema, model, models);
+      console.info('BatchForms:', schema, model, models);
 
       this.instance = instances;
       //cnFlexFormModalLoaderService.resolveMapping('results', this.instance, this);
@@ -136,7 +136,7 @@
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
       $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
-      console.log('BatchDone:', schema, model, models);
+      console.info('BatchDone:', schema, model, models);
 
       return this;
     }
@@ -144,12 +144,14 @@
     function onFieldScope(event, scope) {
       let key = cnFlexFormService.getKey(scope.form.key);
 
-      //console.log('onFieldScope:', key, scope.form.key, scope);
       if(!key.startsWith('__')) {
         if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
         this.fieldRegister[key].ngModel = scope.ngModel;
         this.fieldRegister[key].scope = scope;
+
+        if(!this.fieldRegister[key].field) this.fieldRegister[key].field = scope.form;
       }
+
       // prevent edit mode radiobuttons from setting form to dirty
       else if(scope.form.key[0] === '__batchConfig') {
         scope.ngModel.$pristine = false;
@@ -157,7 +159,6 @@
     }
 
     function processItems(fields) {
-      //console.log('processItems:', field, children);
       let i = fields.length - 1;
       while(i > -1) {
         const child = this.processField(fields[i]);
@@ -223,7 +224,8 @@
         }
         else return false;
       }
-      else if(field.items) {
+
+      if (field.items) {
         if(field.batchConfig) {
           field.items.forEach(child => {
             child.batchConfig = _.clone(field.batchConfig);
@@ -380,7 +382,6 @@
             let register = this.fieldRegister[field._key];
             if(register) {
               if((register.ngModel && register.ngModel.$dirty) || register.initiated) {
-                //console.log('dirtyCheck.key:', key);
                 cnFlexFormService.parseExpression(key, this.model).set(true);
               }
               else {
@@ -389,7 +390,7 @@
             }
             // debug
             else {
-              console.log('noregister:', field, this.fieldRegister);
+              console.debug('noregister:', field, this.fieldRegister);
             }
           }
         }
@@ -413,15 +414,13 @@
 
     function onReprocessField(e, key) {
       let register = this.fieldRegister[key];
-      if(!register) {
-        return console.error('noRegister:', key, this.fieldRegister);
-      }
-      this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
+      if(!register) return console.debug('noRegister:', key, this.fieldRegister);
+      _.get(register, 'dirtyCheck.fieldWatch') && this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
+      if(register.dirtyCheck) this.registerFieldWatch(register.field, register.dirtyCheck.fieldWatch);
     }
 
     function handleLinks(list, hard) {
       return val => {
-        //console.log('val:', list);
         list.forEach(key => {
           if(!hard) {
             let register = this.fieldRegister[key];
@@ -451,7 +450,7 @@
     }
 
     function processLinks() {
-      console.log('this.schema.batchConfig:', this.schema.batchConfig);
+      console.info('this.schema.batchConfig:', this.schema.batchConfig);
       if(this.schema.batchConfig) {
         if(this.schema.batchConfig.links) {
           this.processLinkList(this.schema.batchConfig.links);
@@ -560,13 +559,11 @@
             let update = cnFlexFormService.parseExpression(key, models[i]);
             let original = cnFlexFormService.parseExpression(key, this.models[i]);
 
-            //console.log('val, update, original:', val, update.get(), original.get(), key);
             this.setValue(val, update, original, mode);
           }
         });
       });
 
-      //console.log('models:', models);
       return models;
     }
 
@@ -803,7 +800,7 @@
     function processSchema() {
       this.schema.schema.required = undefined;
       _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
-      console.log('this.defaults:', this.defaults);
+      console.info('this.defaults:', this.defaults);
 
       this.schema.schema.properties.__batchConfig = {
         type: 'object',
