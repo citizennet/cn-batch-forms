@@ -419,9 +419,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
       forms.forEach(function (form) {
         if (form.scope) {
-          form.scope.options = {
-            tv4Validation: val
-          };
+          form.scope.options = form.scope.options || {};
+          form.scope.options.tv4Validation = val;
           Object.keys(form.ngModel.$error).filter(function (k) {
             return k.indexOf('tv4-') === 0;
           }).forEach(function (k) {
