@@ -315,9 +315,8 @@
 
       forms.forEach(form => {
         if(form.scope) {
-          form.scope.options = {
-            tv4Validation: val
-          };
+          form.scope.options = form.scope.options || {};
+          form.scope.options.tv4Validation = val;
           Object.keys(form.ngModel.$error)
               .filter(function(k) {
                 return k.indexOf('tv4-') === 0;
@@ -844,7 +843,7 @@
         this.clearSchemaDefault(schema.items, `${key}[]`);
       }
     }
-
+    
     function showResults(results, config) {
       this.results = results;
       this.resultsConfig = config;
