@@ -235,6 +235,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
       $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
+      console.info('BatchDone:', schema, model, models);
+
       return this;
     }
 
