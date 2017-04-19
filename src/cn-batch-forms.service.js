@@ -250,8 +250,9 @@
             item.items[2].condition = 'false';
           });
         }
+        return field;
       }
-      return field;
+      return false;
     }
 
     function getTitleMap(editModes) {
@@ -306,11 +307,14 @@
     }
 
     function setValidation(field, val) {
-      let key = cnFlexFormService.getKey(field.key);
-
-      if(field.schema && field.schema.type === 'array') {
-        if(_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
-        field.schema.minItems = val ? field.schema._minItems : 0;
+      const key = cnFlexFormService.getKey(field.key);
+      
+      if(field.schema) {
+        const type = _.isArray(field.schema.type) ? field.schema.type : [field.schema.type];
+        if(type.includes('array')) {
+          if(_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
+          field.schema.minItems = val ? field.schema._minItems : 0;
+        }
       }
 
       let forms = key ? this.getFormFromRegister(key) : [];
@@ -352,7 +356,7 @@
       let htmlClass = '';
 
       //if(child) htmlClass += ' semi-transparent';
-      if(field.notitle || !field.schema.title) htmlClass += ' notitle';
+      if(field.notitle || (!field.title && !field.schema.title)) htmlClass += ' notitle';
 
       let dirtyCheck = {
         key,
@@ -706,10 +710,10 @@
     }
 
     function processSelect(field) {
-      let type = field.schema.type;
+      const type = _.isArray(field.schema.type) ? field.schema.type : [field.schema.type];
       let config = field.batchConfig;
 
-      if(type === 'array') {
+      if(type.includes('array')) {
         config.editModes = config.editModes || ['replace', 'append'];
 
         config.default = config.default || 'replace';
@@ -834,14 +838,15 @@
       // then remove because we don't want to override saved values with defaults
       schema.default = undefined;
 
-      if(schema.type === 'object' && schema.properties) {
+      const type = _.isArray(schema.type) ? schema.type : [schema.type];
+      if(type.includes('object') && schema.properties) {
         schema.required = undefined;
         // _.each(schema.properties, this.clearSchemaDefault.bind(this));
         for(let k in schema.properties) {
           this.clearSchemaDefault(schema.properties[k], `${key}.${k}`);
         }
       }
-      else if(schema.type === 'array' && schema.items) {
+      else if(type.includes('array') && schema.items) {
         this.clearSchemaDefault(schema.items, `${key}[]`);
       }
     }

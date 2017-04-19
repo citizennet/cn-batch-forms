@@ -350,8 +350,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             item.items[2].condition = 'false';
           });
         }
+        return field;
       }
-      return field;
+      return false;
     }
 
     function getTitleMap(editModes) {
@@ -412,9 +413,12 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
       var key = cnFlexFormService.getKey(field.key);
 
-      if (field.schema && field.schema.type === 'array') {
-        if (_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
-        field.schema.minItems = val ? field.schema._minItems : 0;
+      if (field.schema) {
+        var type = _.isArray(field.schema.type) ? field.schema.type : [field.schema.type];
+        if (type.includes('array')) {
+          if (_.isUndefined(field.schema._minItems)) field.schema._minItems = field.schema.minItems;
+          field.schema.minItems = val ? field.schema._minItems : 0;
+        }
       }
 
       var forms = key ? this.getFormFromRegister(key) : [];
@@ -457,7 +461,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       var htmlClass = '';
 
       //if(child) htmlClass += ' semi-transparent';
-      if (field.notitle || !field.schema.title) htmlClass += ' notitle';
+      if (field.notitle || !field.title && !field.schema.title) htmlClass += ' notitle';
 
       var dirtyCheck = {
         key: key,
@@ -798,10 +802,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function processSelect(field) {
       var _this8 = this;
 
-      var type = field.schema.type;
+      var type = _.isArray(field.schema.type) ? field.schema.type : [field.schema.type];
       var config = field.batchConfig;
 
-      if (type === 'array') {
+      if (type.includes('array')) {
         config.editModes = config.editModes || ['replace', 'append'];
 
         config.default = config.default || 'replace';
@@ -933,13 +937,14 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       // then remove because we don't want to override saved values with defaults
       schema.default = undefined;
 
-      if (schema.type === 'object' && schema.properties) {
+      var type = _.isArray(schema.type) ? schema.type : [schema.type];
+      if (type.includes('object') && schema.properties) {
         schema.required = undefined;
         // _.each(schema.properties, this.clearSchemaDefault.bind(this));
         for (var k in schema.properties) {
           this.clearSchemaDefault(schema.properties[k], key + '.' + k);
         }
-      } else if (schema.type === 'array' && schema.items) {
+      } else if (type.includes('array') && schema.items) {
         this.clearSchemaDefault(schema.items, key + '[]');
       }
     }
