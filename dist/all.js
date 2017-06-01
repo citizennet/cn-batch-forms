@@ -304,6 +304,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         field.type = field.type || field.schema.type;
 
         delete field.required;
+        if (field.resolve) delete field.resolve.required;
         if (field.conditionals) delete field.conditionals.required;
 
         var fieldType = cnFlexFormTypes.getFieldType(field);

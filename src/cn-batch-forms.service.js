@@ -203,6 +203,7 @@
         field.type = field.type || field.schema.type;
 
         delete field.required;
+        if(field.resolve) delete field.resolve.required;
         if(field.conditionals) delete field.conditionals.required;
 
         let fieldType = cnFlexFormTypes.getFieldType(field);
