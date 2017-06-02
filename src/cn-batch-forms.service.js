@@ -555,7 +555,7 @@
         if(_.isArray(originalVal)) {
           const uniqVal = _([])
             .concat(originalVal, val)
-            .uniq((value) => value.key || value)
+            .uniq((value) => value.key || angular.toJson(value))
             .value();
 
           update.set(uniqVal);

@@ -656,7 +656,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         var originalVal = original.get();
         if (_.isArray(originalVal)) {
           var uniqVal = _([]).concat(originalVal, val).uniq(function (value) {
-            return value.key || value;
+            return value.key || angular.toJson(value);
           }).value();
 
           update.set(uniqVal);
