@@ -304,6 +304,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         field.type = field.type || field.schema.type;
 
         delete field.required;
+        if (field.resolve) delete field.resolve.required;
         if (field.conditionals) delete field.conditionals.required;
 
         var fieldType = cnFlexFormTypes.getFieldType(field);
@@ -347,7 +348,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             field.batchConfig.watch.push({
               resolution: 'model.__batchConfig["' + child.key + '"] = model.__batchConfig["' + field.batchConfig.key + '"]'
             });
-            item.items[2].condition = 'false';
+            //item.items[2].condition = 'false';
+            item.items[2].htmlClass = 'hide';
           });
         }
       }
@@ -386,7 +388,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       };
 
       if (batchField.titleMap.length === 1) {
-        batchField.condition = 'false';
+        //batchField.condition = 'false';
+        batchField.htmlClass = 'hide';
       }
 
       this.addToSchema(key, {
@@ -653,7 +656,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         var originalVal = original.get();
         if (_.isArray(originalVal)) {
           var uniqVal = _([]).concat(originalVal, val).uniq(function (value) {
-            return value.key || value;
+            return value.key || angular.toJson(value);
           }).value();
 
           update.set(uniqVal);

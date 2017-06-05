@@ -203,6 +203,7 @@
         field.type = field.type || field.schema.type;
 
         delete field.required;
+        if(field.resolve) delete field.resolve.required;
         if(field.conditionals) delete field.conditionals.required;
 
         let fieldType = cnFlexFormTypes.getFieldType(field);
@@ -247,7 +248,8 @@
             field.batchConfig.watch.push({
               resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
             });
-            item.items[2].condition = 'false';
+            //item.items[2].condition = 'false';
+            item.items[2].htmlClass = 'hide';
           });
         }
       }
@@ -284,7 +286,8 @@
       };
 
       if(batchField.titleMap.length === 1) {
-        batchField.condition = 'false';
+        //batchField.condition = 'false';
+        batchField.htmlClass = 'hide';
       }
 
       this.addToSchema(key, {
@@ -552,7 +555,7 @@
         if(_.isArray(originalVal)) {
           const uniqVal = _([])
             .concat(originalVal, val)
-            .uniq((value) => value.key || value)
+            .uniq((value) => value.key || angular.toJson(value))
             .value();
 
           update.set(uniqVal);
