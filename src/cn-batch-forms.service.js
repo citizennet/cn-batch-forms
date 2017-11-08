@@ -30,6 +30,7 @@
   }
 
   cnBatchForms.$inject = [
+    'cnFlexFormConfig',
     'cnFlexFormService',
     'cnFlexFormTypes',
     'sfPath',
@@ -38,6 +39,7 @@
     'cnModal'
   ];
   function cnBatchForms(
+      cnFlexFormConfig,
       cnFlexFormService,
       cnFlexFormTypes,
       sfPath,
@@ -80,6 +82,8 @@
         onFieldScope,
         onReprocessField,
         processCondition,
+        processDiff,
+        processSchemaDiff,
         processSchema,
         processField,
         processItems,
@@ -113,6 +117,7 @@
       this.fieldRegister = {};
 
       this.processSchema();
+      cnFlexFormConfig.onProcessDiff = this.processDiff.bind(this);
 
       if(schema.forms) {
         let i = schema.forms.length - 1;
@@ -155,6 +160,24 @@
       else if(scope.form.key[0] === '__batchConfig') {
         scope.ngModel.$pristine = false;
       }
+    }
+
+    function processDiff(schema) {
+      const updateSchema = schema.params.updateSchema;
+      const links = _.filter(schema.batchConfig.links, ls => _.includes(ls, updateSchema));
+      const hardLinks = _.filter(schema.batchConfig.hardLinks, ls => _.includes(ls, updateSchema));
+      processSchemaDiff.call(this, schema.diff.schema, _.flatten(links.concat(hardLinks)));
+    }
+
+    function processSchemaDiff(properties, links) {
+      const props = _.keys(properties);
+      _.forEach(props, (prop) => {
+        if (_.has(properties[prop], "properties")) {
+          processSchemaDiff.call(this, properties[prop].properties, links);
+        } else if (_.every(links, l => !_.includes(l, prop))) {
+          clearSchemaDefault.call(this, properties[prop]);
+        }
+      });
     }
 
     function processItems(fields) {
