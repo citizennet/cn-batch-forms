@@ -264,10 +264,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     function processDiff(schema) {
       var updateSchema = schema.params.updateSchema;
       var links = _.filter(schema.batchConfig.links, function (ls) {
-        return _.includes(ls, updateSchema);
+        return _.startsWith(ls, updateSchema);
       });
       var hardLinks = _.filter(schema.batchConfig.hardLinks, function (ls) {
-        return _.includes(ls, updateSchema);
+        return _.startsWith(ls, updateSchema);
       });
       processSchemaDiff.call(this, schema.diff.schema, _.flatten(links.concat(hardLinks)));
     }
@@ -279,6 +279,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
       _.forEach(props, function (prop) {
         if (_.has(properties[prop], "properties")) {
           processSchemaDiff.call(_this, properties[prop].properties, links);
+        } else if (_.has(properties[prop], "items")) {
+          processSchemaDiff.call(_this, properties[prop].items, links);
         } else if (_.every(links, function (l) {
           return !_.includes(l, prop);
         })) {

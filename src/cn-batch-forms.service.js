@@ -164,8 +164,8 @@
 
     function processDiff(schema) {
       const updateSchema = schema.params.updateSchema;
-      const links = _.filter(schema.batchConfig.links, ls => _.includes(ls, updateSchema));
-      const hardLinks = _.filter(schema.batchConfig.hardLinks, ls => _.includes(ls, updateSchema));
+      const links = _.filter(schema.batchConfig.links, ls => _.startsWith(ls, updateSchema));
+      const hardLinks = _.filter(schema.batchConfig.hardLinks, ls => _.startsWith(ls, updateSchema));
       processSchemaDiff.call(this, schema.diff.schema, _.flatten(links.concat(hardLinks)));
     }
 
@@ -174,6 +174,8 @@
       _.forEach(props, (prop) => {
         if (_.has(properties[prop], "properties")) {
           processSchemaDiff.call(this, properties[prop].properties, links);
+        } else if (_.has(properties[prop], "items")) {
+          processSchemaDiff.call(this, properties[prop].items, links);
         } else if (_.every(links, l => !_.includes(l, prop))) {
           clearSchemaDefault.call(this, properties[prop]);
         }
