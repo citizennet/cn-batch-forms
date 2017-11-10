@@ -61,16 +61,6 @@ gulp.task('webpack:test', () =>
   ])
 );
 
-// Add templates to templateCache
-gulp.task('templates', function() {
-  return gulp.src('src/templates/*.html')
-      .pipe(templateCache({
-        root: 'cn-batch-forms',
-        module: 'cn.batch-forms'
-      }))
-      .pipe(gulp.dest('src'));
-});
-
 // Concatenate & Transpile JS
 gulp.task('scripts', function () {
   return gulp.src('src/*.js')
