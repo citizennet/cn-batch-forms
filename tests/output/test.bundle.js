@@ -8869,8 +8869,6 @@ function processDiff(service) {
 function processSchemaDiff(service, schema, links) {
   var key = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : "";
 
-  console.log("key::", key);
-  console.log("links::", links);
   if (_.has(schema, "default") && _.every(links, function (l) {
     return !_.startsWith(key, l);
   })) {

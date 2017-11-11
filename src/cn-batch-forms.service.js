@@ -45,8 +45,6 @@ export function processDiff(service) {
 }
 
 export function processSchemaDiff(service, schema, links, key="") {
-  console.log("key::", key)
-  console.log("links::", links)
   if (_.has(schema, "default") && _.every(links, l => !_.startsWith(key, l))) {
     clearSchemaDefault(service, schema, key)
   } else if (schema.type === 'object') {
