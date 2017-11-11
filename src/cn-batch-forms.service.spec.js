@@ -207,3 +207,164 @@ test('processDiff', t => {
   
 })
 
+test('processDiffSimilarFields', t => {
+  const service = { 
+    defaults: {},
+    schema: {
+      diff: {
+        schema: _.cloneDeep(schemaTpl.properties)
+      },
+      batchConfig: {
+        links: [
+          [ "far[].raf", "far[].gat" ]
+        ],
+        hardLinks: [
+          [ "foo.bar", "foo.baz", "foo.far" ]
+        ]
+      },
+      params: {
+        updateSchema: "foo.far"
+      }
+    }
+  }
+  const expected = {
+    foo: {
+      type: 'object',
+      properties: {
+        bar: {
+          default: 12,
+          type: 'integer'
+        },
+        baz: {
+          type: 'array',
+          items: {
+            type: 'string',
+            default: 'default string'
+          }
+        },
+        far: {
+          type: 'string',
+          default: 'test duplicate key string'
+        },
+        zed: {
+          type: 'array',
+          items: {
+            properties: {
+              jam: {
+                type: 'integer',
+                default: undefined
+              }
+            },
+            type: 'object'
+          }
+        }
+      }
+    },
+    far: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          raf: {
+            type: 'string',
+            default: undefined
+          },
+          gat: {
+            type: 'number',
+            default: undefined
+          }
+        }
+      }
+    }
+  }
+
+  processDiff(service)(service.schema)
+  t.deepEqual(
+    service.schema.diff.schema,
+    expected
+  )
+
+  t.end()
+  
+})
+
+test('processDiffSimilarFieldsAgain', t => {
+  const service = { 
+    defaults: {},
+    schema: {
+      diff: {
+        schema: _.cloneDeep(schemaTpl.properties)
+      },
+      batchConfig: {
+        links: [
+          [ "far", "foo.zed" ]
+        ],
+        hardLinks: [
+          [ "foo.bar", "foo.baz", "foo.far" ]
+        ]
+      },
+      params: {
+        updateSchema: "far"
+      }
+    }
+  }
+  const expected = {
+    foo: {
+      type: 'object',
+      properties: {
+        bar: {
+          default: undefined,
+          type: 'integer'
+        },
+        baz: {
+          type: 'array',
+          items: {
+            type: 'string',
+            default: undefined,
+          }
+        },
+        far: {
+          type: 'string',
+          default: undefined,
+        },
+        zed: {
+          type: 'array',
+          items: {
+            properties: {
+              jam: {
+                type: 'integer',
+                default: 42
+              }
+            },
+            type: 'object'
+          }
+        }
+      }
+    },
+    far: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          raf: {
+            type: 'string',
+            default: 'simmons'
+          },
+          gat: {
+            type: 'number',
+            default: 9
+          }
+        }
+      }
+    }
+  }
+
+  processDiff(service)(service.schema)
+  t.deepEqual(
+    service.schema.diff.schema,
+    expected
+  )
+
+  t.end()
+  
+})

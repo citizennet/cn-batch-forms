@@ -5600,6 +5600,152 @@ var schemaTpl = {
   t.end();
 });
 
+(0, _tape2.default)('processDiffSimilarFields', function (t) {
+  var service = {
+    defaults: {},
+    schema: {
+      diff: {
+        schema: _.cloneDeep(schemaTpl.properties)
+      },
+      batchConfig: {
+        links: [["far[].raf", "far[].gat"]],
+        hardLinks: [["foo.bar", "foo.baz", "foo.far"]]
+      },
+      params: {
+        updateSchema: "foo.far"
+      }
+    }
+  };
+  var expected = {
+    foo: {
+      type: 'object',
+      properties: {
+        bar: {
+          default: 12,
+          type: 'integer'
+        },
+        baz: {
+          type: 'array',
+          items: {
+            type: 'string',
+            default: 'default string'
+          }
+        },
+        far: {
+          type: 'string',
+          default: 'test duplicate key string'
+        },
+        zed: {
+          type: 'array',
+          items: {
+            properties: {
+              jam: {
+                type: 'integer',
+                default: undefined
+              }
+            },
+            type: 'object'
+          }
+        }
+      }
+    },
+    far: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          raf: {
+            type: 'string',
+            default: undefined
+          },
+          gat: {
+            type: 'number',
+            default: undefined
+          }
+        }
+      }
+    }
+  };
+
+  (0, _cnBatchForms.processDiff)(service)(service.schema);
+  t.deepEqual(service.schema.diff.schema, expected);
+
+  t.end();
+});
+
+(0, _tape2.default)('processDiffSimilarFieldsAgain', function (t) {
+  var service = {
+    defaults: {},
+    schema: {
+      diff: {
+        schema: _.cloneDeep(schemaTpl.properties)
+      },
+      batchConfig: {
+        links: [["far", "foo.zed"]],
+        hardLinks: [["foo.bar", "foo.baz", "foo.far"]]
+      },
+      params: {
+        updateSchema: "far"
+      }
+    }
+  };
+  var expected = {
+    foo: {
+      type: 'object',
+      properties: {
+        bar: {
+          default: undefined,
+          type: 'integer'
+        },
+        baz: {
+          type: 'array',
+          items: {
+            type: 'string',
+            default: undefined
+          }
+        },
+        far: {
+          type: 'string',
+          default: undefined
+        },
+        zed: {
+          type: 'array',
+          items: {
+            properties: {
+              jam: {
+                type: 'integer',
+                default: 42
+              }
+            },
+            type: 'object'
+          }
+        }
+      }
+    },
+    far: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          raf: {
+            type: 'string',
+            default: 'simmons'
+          },
+          gat: {
+            type: 'number',
+            default: 9
+          }
+        }
+      }
+    }
+  };
+
+  (0, _cnBatchForms.processDiff)(service)(service.schema);
+  t.deepEqual(service.schema.diff.schema, expected);
+
+  t.end();
+});
+
 /***/ }),
 /* 28 */
 /***/ (function(module, exports, __webpack_require__) {
