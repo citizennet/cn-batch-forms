@@ -1,6 +1,9 @@
 import test from 'tape'
 
-import { clearSchemaDefault } from './cn-batch-forms.service'
+import { 
+  clearSchemaDefault,
+  processDiff
+} from './cn-batch-forms.service'
 
 const schemaTpl = {
   type: 'object',
@@ -19,6 +22,10 @@ const schemaTpl = {
             default: 'default string'
           }
         },
+        far: {
+          type: 'string',
+          default: 'test duplicate key string'
+        },
         zed: {
           type: 'array',
           items: {
@@ -36,8 +43,17 @@ const schemaTpl = {
     far: {
       type: 'array',
       items: {
-        type: 'string',
-        default: 'Mike'
+        type: 'object',
+        properties: {
+          raf: {
+            type: 'string',
+            default: 'simmons'
+          },
+          gat: {
+            type: 'number',
+            default: 9
+          }
+        }
       }
     }
   }
@@ -46,7 +62,7 @@ const schemaTpl = {
 
 test('clearSchemaDefault', t => {
   const service = { defaults: {} }
-  const schema = { ...schemaTpl }
+  const schema = _.cloneDeep(schemaTpl)
   const expected = {
     type: 'object',
     properties: {
@@ -63,6 +79,10 @@ test('clearSchemaDefault', t => {
               type: 'string',
               default: undefined
             }
+          },
+          far: {
+            type: 'string',
+            default: undefined
           },
           zed: {
             type: 'array',
@@ -81,8 +101,17 @@ test('clearSchemaDefault', t => {
       far: {
         type: 'array',
         items: {
-          type: 'string',
-          default: undefined
+          type: 'object',
+          properties: {
+            raf: {
+              type: 'string',
+              default: undefined
+            },
+            gat: {
+              type: 'number',
+              default: undefined
+            }
+          }
         }
       }
     }
@@ -95,5 +124,86 @@ test('clearSchemaDefault', t => {
   )
 
   t.end()
+})
+
+test('processDiff', t => {
+  const service = { 
+    defaults: {},
+    schema: {
+      diff: {
+        schema: _.cloneDeep(schemaTpl.properties)
+      },
+      batchConfig: {
+        links: [
+          [ "far[].raf", "far[].gat" ]
+        ],
+        hardLinks: [
+          [ "foo.bar", "foo.baz", "foo.zed" ]
+        ]
+      },
+      params: {
+        updateSchema: "foo.bar"
+      }
+    }
+  }
+  const expected = {
+    foo: {
+      type: 'object',
+      properties: {
+        bar: {
+          default: 12,
+          type: 'integer'
+        },
+        baz: {
+          type: 'array',
+          items: {
+            type: 'string',
+            default: 'default string'
+          }
+        },
+        far: {
+          type: 'string',
+          default: undefined
+        },
+        zed: {
+          type: 'array',
+          items: {
+            properties: {
+              jam: {
+                type: 'integer',
+                default: 42
+              }
+            },
+            type: 'object'
+          }
+        }
+      }
+    },
+    far: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          raf: {
+            type: 'string',
+            default: undefined
+          },
+          gat: {
+            type: 'number',
+            default: undefined
+          }
+        }
+      }
+    }
+  }
+
+  processDiff(service)(service.schema)
+  t.deepEqual(
+    service.schema.diff.schema,
+    expected
+  )
+
+  t.end()
+  
 })
 

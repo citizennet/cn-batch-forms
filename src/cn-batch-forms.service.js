@@ -1,3 +1,6 @@
+// Needed for test bundle
+const _ = typeof window !== 'undefined' && window._ || require('lodash');
+
 let fieldTypeHandlers = {
   'string': 'processDefault',
   'number': 'processNumber',
@@ -25,6 +28,34 @@ export function clearSchemaDefault(service, schema, key) {
   }
   else if(schema.type === 'array' && schema.items) {
     clearSchemaDefault(service, schema.items, `${key}[]`);
+  }
+}
+
+export function processDiff(service) {
+  return (schema) => {
+    const updateSchema = schema.params.updateSchema;
+    const links = _.filter(schema.batchConfig.links, ls => _.includes(ls, updateSchema));
+    const hardLinks = _.filter(schema.batchConfig.hardLinks, ls => _.includes(ls, updateSchema));
+    processSchemaDiff(
+      service,
+      { type: 'object', properties: schema.diff.schema },
+      _.flatten(links.concat(hardLinks))
+    );
+  }
+}
+
+export function processSchemaDiff(service, schema, links, key="") {
+  console.log("key::", key)
+  console.log("links::", links)
+  if (_.has(schema, "default") && _.every(links, l => !_.startsWith(key, l))) {
+    clearSchemaDefault(service, schema, key)
+  } else if (schema.type === 'object') {
+    _.forEach(schema.properties, (v, k) => {
+      const prefix = key ? `${key}.` : key;
+      processSchemaDiff(service, v, links, `${prefix}${k}`);
+    })
+  } else if (schema.type === 'array') {
+    processSchemaDiff(service, schema.items, links, `${key}[]`)
   }
 }
 
@@ -88,8 +119,6 @@ function cnBatchForms(
       onFieldScope,
       onReprocessField,
       processCondition,
-      processDiff,
-      processSchemaDiff,
       processSchema,
       processField,
       processItems,
@@ -123,7 +152,7 @@ function cnBatchForms(
     this.fieldRegister = {};
 
     this.processSchema();
-    cnFlexFormConfig.onProcessDiff = this.processDiff.bind(this);
+    cnFlexFormConfig.onProcessDiff = processDiff(this);
 
     if(schema.forms) {
       let i = schema.forms.length - 1;
@@ -168,25 +197,6 @@ function cnBatchForms(
     }
   }
 
-  function processDiff(schema) {
-    const updateSchema = schema.params.updateSchema;
-    const links = _.filter(schema.batchConfig.links, ls => _.startsWith(ls, updateSchema));
-    const hardLinks = _.filter(schema.batchConfig.hardLinks, ls => _.startsWith(ls, updateSchema));
-    processSchemaDiff.call(this, schema.diff.schema, _.flatten(links.concat(hardLinks)));
-  }
-
-  function processSchemaDiff(properties, links) {
-    const props = _.keys(properties);
-    _.forEach(props, (prop) => {
-      if (_.has(properties[prop], "properties")) {
-        processSchemaDiff.call(this, properties[prop].properties, links);
-      } else if (_.has(properties[prop], "items")) {
-        processSchemaDiff.call(this, properties[prop].items, links);
-      } else if (_.every(links, l => !_.includes(l, prop))) {
-        clearSchemaDefault(this, properties[prop], prop);
-      }
-    });
-  }
 
   function processItems(fields) {
     let i = fields.length - 1;
