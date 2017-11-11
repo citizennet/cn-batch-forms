@@ -222,6 +222,7 @@ cnBatchForms.$inject = ["cnFlexFormConfig", "cnFlexFormService", "cnFlexFormType
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.clearSchemaDefault = clearSchemaDefault;
 exports.default = cnBatchFormsProvider;
 var fieldTypeHandlers = {
   'string': 'processDefault',
@@ -233,6 +234,24 @@ var fieldTypeHandlers = {
   'cn-datetimepicker': 'processDate',
   'cn-toggle': 'processToggle'
 };
+
+function clearSchemaDefault(service, schema, key) {
+  // save for hydrating newly added array items
+  service.defaults[key] = schema.default;
+
+  // then remove because we don't want to override saved values with defaults
+  if ("default" in schema) schema.default = undefined;
+
+  if (schema.type === 'object' && schema.properties) {
+    if ("required" in schema) schema.required = undefined;
+    // _.each(schema.properties, service.clearSchemaDefault.bind(this));
+    for (var k in schema.properties) {
+      clearSchemaDefault(service, schema.properties[k], key + '.' + k);
+    }
+  } else if (schema.type === 'array' && schema.items) {
+    clearSchemaDefault(service, schema.items, key + '[]');
+  }
+}
 
 function cnBatchFormsProvider() {
   return {
@@ -274,7 +293,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       constructor: constructor,
       addMeta: addMeta,
       addToSchema: addToSchema,
-      clearSchemaDefault: clearSchemaDefault,
       closeModal: closeModal,
       createDirtyCheck: createDirtyCheck,
       createBatchField: createBatchField,
@@ -390,7 +408,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       } else if (_.every(links, function (l) {
         return !_.includes(l, prop);
       })) {
-        clearSchemaDefault.call(_this, properties[prop]);
+        clearSchemaDefault(_this, properties[prop], prop);
       }
     });
   }
@@ -1010,7 +1028,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     var _this10 = this;
 
     this.schema.schema.required = undefined;
-    _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+    _.each(this.schema.schema.properties, function (val, key) {
+      return clearSchemaDefault(_this10, val, key);
+    });
 
     this.schema.schema.properties.__batchConfig = {
       type: 'object',
@@ -1064,24 +1084,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       }
       _this12.resetDefaults(item);
     });
-  }
-
-  function clearSchemaDefault(schema, key) {
-    // save for hydrating newly added array items
-    this.defaults[key] = schema.default;
-
-    // then remove because we don't want to override saved values with defaults
-    schema.default = undefined;
-
-    if (schema.type === 'object' && schema.properties) {
-      schema.required = undefined;
-      // _.each(schema.properties, this.clearSchemaDefault.bind(this));
-      for (var k in schema.properties) {
-        this.clearSchemaDefault(schema.properties[k], key + '.' + k);
-      }
-    } else if (schema.type === 'array' && schema.items) {
-      this.clearSchemaDefault(schema.items, key + '[]');
-    }
   }
 
   function showResults(results, config) {

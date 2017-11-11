@@ -9,6 +9,25 @@ let fieldTypeHandlers = {
   'cn-toggle': 'processToggle'
 };
 
+export function clearSchemaDefault(service, schema, key) {
+  // save for hydrating newly added array items
+  service.defaults[key] = schema.default;
+
+  // then remove because we don't want to override saved values with defaults
+  if ("default" in schema) schema.default = undefined;
+
+  if(schema.type === 'object' && schema.properties) {
+    if ("required" in schema) schema.required = undefined;
+    // _.each(schema.properties, service.clearSchemaDefault.bind(this));
+    for(let k in schema.properties) {
+      clearSchemaDefault(service, schema.properties[k], `${key}.${k}`);
+    }
+  }
+  else if(schema.type === 'array' && schema.items) {
+    clearSchemaDefault(service, schema.items, `${key}[]`);
+  }
+}
+
 export default function cnBatchFormsProvider() {
   return {
     registerField,
@@ -56,7 +75,6 @@ function cnBatchForms(
       constructor,
       addMeta,
       addToSchema,
-      clearSchemaDefault,
       closeModal,
       createDirtyCheck,
       createBatchField,
@@ -165,7 +183,7 @@ function cnBatchForms(
       } else if (_.has(properties[prop], "items")) {
         processSchemaDiff.call(this, properties[prop].items, links);
       } else if (_.every(links, l => !_.includes(l, prop))) {
-        clearSchemaDefault.call(this, properties[prop]);
+        clearSchemaDefault(this, properties[prop], prop);
       }
     });
   }
@@ -795,7 +813,7 @@ function cnBatchForms(
 
   function processSchema() {
     this.schema.schema.required = undefined;
-    _.each(this.schema.schema.properties, this.clearSchemaDefault.bind(this));
+    _.each(this.schema.schema.properties, (val, key) => clearSchemaDefault(this, val, key));
 
     this.schema.schema.properties.__batchConfig = {
       type: 'object',
@@ -843,24 +861,6 @@ function cnBatchForms(
     });
   }
 
-  function clearSchemaDefault(schema, key) {
-    // save for hydrating newly added array items
-    this.defaults[key] = schema.default;
-
-    // then remove because we don't want to override saved values with defaults
-    schema.default = undefined;
-
-    if(schema.type === 'object' && schema.properties) {
-      schema.required = undefined;
-      // _.each(schema.properties, this.clearSchemaDefault.bind(this));
-      for(let k in schema.properties) {
-        this.clearSchemaDefault(schema.properties[k], `${key}.${k}`);
-      }
-    }
-    else if(schema.type === 'array' && schema.items) {
-      this.clearSchemaDefault(schema.items, `${key}[]`);
-    }
-  }
   
   function showResults(results, config) {
     this.results = results;

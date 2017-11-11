@@ -1,6 +1,6 @@
 const webpack = require('webpack');
 
-module.exports = {
+const bundle = {
 
   devtool: 'source-map',
 
@@ -44,3 +44,33 @@ module.exports = {
 
 };
 
+const tests = {
+  entry: './tests/webpack.test.bootstrap.js',
+
+  output: {
+    filename: './tests/output/test.bundle.js'
+  },
+
+  module: {
+    rules: [
+      {
+        exclude: /node_modules/,
+        use: [
+          { loader: 'babel-loader' }
+        ],
+        test: /\.js$/
+      },
+    ]
+  },
+
+  resolve: {
+    modules: ['node_modules'],
+    extensions: ['.js']
+  },
+
+  node: {
+    fs: 'empty'
+  },
+}
+
+module.exports = [ bundle, tests ]

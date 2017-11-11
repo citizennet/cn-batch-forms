@@ -8,7 +8,7 @@
     "build": "src/*.js"
   },
   "scripts": {
-    "test": "tape tests/output/test.bundle.js | faucet",
+    "test": "tape tests/output/test.bundle.js",
     "build": "webpack --bail --progress --profile --color",
     "watch": "npm-watch"
   },
@@ -25,6 +25,7 @@
   "devDependencies": {
     "babel-core": "^6.26.0",
     "babel-loader": "^7.1.2",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-preset-env": "^1.6.1",
     "eslint": "^4.10.0",
     "ng-annotate-loader": "^0.6.1",
