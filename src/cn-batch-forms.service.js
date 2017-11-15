@@ -32,7 +32,6 @@ export function clearSchemaDefault(service, schema, key) {
 }
 
 export function processDiff(service) {
-  const schema = service.schema;
   return payload => {
     const updateSchema = payload.params.updateSchema;
     const links = _.filter(schema.batchConfig.links, ls => _.includes(ls, updateSchema));
