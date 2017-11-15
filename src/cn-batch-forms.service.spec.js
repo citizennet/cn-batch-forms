@@ -1,6 +1,6 @@
 import test from 'tape'
 
-import { 
+import {
   clearSchemaDefault,
   processDiff
 } from './cn-batch-forms.service'
@@ -61,8 +61,12 @@ const schemaTpl = {
 
 
 test('clearSchemaDefault', t => {
-  const service = { defaults: {} }
-  const schema = _.cloneDeep(schemaTpl)
+  const service = {
+    defaults: {},
+    schema: {
+      schema: _.cloneDeep(schemaTpl)
+    }
+  }
   const expected = {
     type: 'object',
     properties: {
@@ -117,9 +121,9 @@ test('clearSchemaDefault', t => {
     }
   }
 
-  clearSchemaDefault(service, schema); 
+  clearSchemaDefault(service, service.schema.schema);
   t.deepEqual(
-    schema,
+    service.schema.schema,
     expected
   )
 
@@ -127,12 +131,10 @@ test('clearSchemaDefault', t => {
 })
 
 test('processDiff', t => {
-  const service = { 
+  const service = {
     defaults: {},
     schema: {
-      diff: {
-        schema: _.cloneDeep(schemaTpl.properties)
-      },
+      schema: _.cloneDeep(schemaTpl),
       batchConfig: {
         links: [
           [ "far[].raf", "far[].gat" ]
@@ -140,10 +142,15 @@ test('processDiff', t => {
         hardLinks: [
           [ "foo.bar", "foo.baz", "foo.zed" ]
         ]
-      },
-      params: {
-        updateSchema: "foo.bar"
       }
+    }
+  }
+  const payload = {
+    diff: {
+      schema: _.cloneDeep(schemaTpl.properties)
+    },
+    params: {
+      updateSchema: "foo.bar"
     }
   }
   const expected = {
@@ -197,23 +204,20 @@ test('processDiff', t => {
     }
   }
 
-  processDiff(service)(service.schema)
+  processDiff(service)(payload)
   t.deepEqual(
-    service.schema.diff.schema,
+    service.schema.schema.properties,
     expected
   )
 
   t.end()
-  
 })
 
 test('processDiffSimilarFields', t => {
-  const service = { 
+  const service = {
     defaults: {},
     schema: {
-      diff: {
-        schema: _.cloneDeep(schemaTpl.properties)
-      },
+      schema: _.cloneDeep(schemaTpl),
       batchConfig: {
         links: [
           [ "far[].raf", "far[].gat" ]
@@ -221,10 +225,15 @@ test('processDiffSimilarFields', t => {
         hardLinks: [
           [ "foo.bar", "foo.baz", "foo.far" ]
         ]
-      },
-      params: {
-        updateSchema: "foo.far"
       }
+    }
+  }
+  const payload = {
+    diff: {
+      schema: _.cloneDeep(schemaTpl.properties)
+    },
+    params: {
+      updateSchema: "foo.far"
     }
   }
   const expected = {
@@ -278,23 +287,20 @@ test('processDiffSimilarFields', t => {
     }
   }
 
-  processDiff(service)(service.schema)
+  processDiff(service)(payload)
   t.deepEqual(
-    service.schema.diff.schema,
+    service.schema.schema.properties,
     expected
   )
 
   t.end()
-  
 })
 
 test('processDiffSimilarFieldsAgain', t => {
-  const service = { 
+  const service = {
     defaults: {},
     schema: {
-      diff: {
-        schema: _.cloneDeep(schemaTpl.properties)
-      },
+      schema: _.cloneDeep(schemaTpl),
       batchConfig: {
         links: [
           [ "far", "foo.zed" ]
@@ -303,9 +309,14 @@ test('processDiffSimilarFieldsAgain', t => {
           [ "foo.bar", "foo.baz", "foo.far" ]
         ]
       },
-      params: {
-        updateSchema: "far"
-      }
+    }
+  }
+  const payload = {
+    diff: {
+      schema: _.cloneDeep(schemaTpl.properties)
+    },
+    params: {
+      updateSchema: "far"
     }
   }
   const expected = {
@@ -359,12 +370,11 @@ test('processDiffSimilarFieldsAgain', t => {
     }
   }
 
-  processDiff(service)(service.schema)
+  processDiff(service)(payload)
   t.deepEqual(
-    service.schema.diff.schema,
+    service.schema.schema.properties,
     expected
   )
 
   t.end()
-  
 })
