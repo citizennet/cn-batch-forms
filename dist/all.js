@@ -259,15 +259,18 @@ function clearSchemaDefault(service, schema, key) {
 }
 
 function processDiff(service) {
-  return function (schema) {
-    var updateSchema = schema.params.updateSchema;
+  var schema = service.schema;
+  return function (payload) {
+    var updateSchema = payload.params.updateSchema;
     var links = _.filter(schema.batchConfig.links, function (ls) {
       return _.includes(ls, updateSchema);
     });
     var hardLinks = _.filter(schema.batchConfig.hardLinks, function (ls) {
       return _.includes(ls, updateSchema);
     });
-    processSchemaDiff(service, { type: 'object', properties: schema.diff.schema }, _.flatten(links.concat(hardLinks)));
+    // ;_;
+    Object.assign(service.schema.schema.properties, payload.diff.schema);
+    processSchemaDiff(service, service.schema.schema, _.flatten(links.concat(hardLinks)));
   };
 }
 

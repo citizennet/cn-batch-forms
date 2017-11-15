@@ -32,13 +32,16 @@ export function clearSchemaDefault(service, schema, key) {
 }
 
 export function processDiff(service) {
-  return (schema) => {
-    const updateSchema = schema.params.updateSchema;
+  const schema = service.schema;
+  return payload => {
+    const updateSchema = payload.params.updateSchema;
     const links = _.filter(schema.batchConfig.links, ls => _.includes(ls, updateSchema));
     const hardLinks = _.filter(schema.batchConfig.hardLinks, ls => _.includes(ls, updateSchema));
+    // ;_;
+    Object.assign(service.schema.schema.properties, payload.diff.schema);
     processSchemaDiff(
       service,
-      { type: 'object', properties: schema.diff.schema },
+      service.schema.schema,
       _.flatten(links.concat(hardLinks))
     );
   }

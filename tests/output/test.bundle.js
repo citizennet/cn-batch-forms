@@ -5465,8 +5465,12 @@ var schemaTpl = {
 };
 
 (0, _tape2.default)('clearSchemaDefault', function (t) {
-  var service = { defaults: {} };
-  var schema = _.cloneDeep(schemaTpl);
+  var service = {
+    defaults: {},
+    schema: {
+      schema: _.cloneDeep(schemaTpl)
+    }
+  };
   var expected = {
     type: 'object',
     properties: {
@@ -5521,8 +5525,8 @@ var schemaTpl = {
     }
   };
 
-  (0, _cnBatchForms.clearSchemaDefault)(service, schema);
-  t.deepEqual(schema, expected);
+  (0, _cnBatchForms.clearSchemaDefault)(service, service.schema.schema);
+  t.deepEqual(service.schema.schema, expected);
 
   t.end();
 });
@@ -5531,16 +5535,19 @@ var schemaTpl = {
   var service = {
     defaults: {},
     schema: {
-      diff: {
-        schema: _.cloneDeep(schemaTpl.properties)
-      },
+      schema: _.cloneDeep(schemaTpl),
       batchConfig: {
         links: [["far[].raf", "far[].gat"]],
         hardLinks: [["foo.bar", "foo.baz", "foo.zed"]]
-      },
-      params: {
-        updateSchema: "foo.bar"
       }
+    }
+  };
+  var payload = {
+    diff: {
+      schema: _.cloneDeep(schemaTpl.properties)
+    },
+    params: {
+      updateSchema: "foo.bar"
     }
   };
   var expected = {
@@ -5594,8 +5601,8 @@ var schemaTpl = {
     }
   };
 
-  (0, _cnBatchForms.processDiff)(service)(service.schema);
-  t.deepEqual(service.schema.diff.schema, expected);
+  (0, _cnBatchForms.processDiff)(service)(payload);
+  t.deepEqual(service.schema.schema.properties, expected);
 
   t.end();
 });
@@ -5604,16 +5611,19 @@ var schemaTpl = {
   var service = {
     defaults: {},
     schema: {
-      diff: {
-        schema: _.cloneDeep(schemaTpl.properties)
-      },
+      schema: _.cloneDeep(schemaTpl),
       batchConfig: {
         links: [["far[].raf", "far[].gat"]],
         hardLinks: [["foo.bar", "foo.baz", "foo.far"]]
-      },
-      params: {
-        updateSchema: "foo.far"
       }
+    }
+  };
+  var payload = {
+    diff: {
+      schema: _.cloneDeep(schemaTpl.properties)
+    },
+    params: {
+      updateSchema: "foo.far"
     }
   };
   var expected = {
@@ -5667,8 +5677,8 @@ var schemaTpl = {
     }
   };
 
-  (0, _cnBatchForms.processDiff)(service)(service.schema);
-  t.deepEqual(service.schema.diff.schema, expected);
+  (0, _cnBatchForms.processDiff)(service)(payload);
+  t.deepEqual(service.schema.schema.properties, expected);
 
   t.end();
 });
@@ -5677,16 +5687,19 @@ var schemaTpl = {
   var service = {
     defaults: {},
     schema: {
-      diff: {
-        schema: _.cloneDeep(schemaTpl.properties)
-      },
+      schema: _.cloneDeep(schemaTpl),
       batchConfig: {
         links: [["far", "foo.zed"]],
         hardLinks: [["foo.bar", "foo.baz", "foo.far"]]
-      },
-      params: {
-        updateSchema: "far"
       }
+    }
+  };
+  var payload = {
+    diff: {
+      schema: _.cloneDeep(schemaTpl.properties)
+    },
+    params: {
+      updateSchema: "far"
     }
   };
   var expected = {
@@ -5740,8 +5753,8 @@ var schemaTpl = {
     }
   };
 
-  (0, _cnBatchForms.processDiff)(service)(service.schema);
-  t.deepEqual(service.schema.diff.schema, expected);
+  (0, _cnBatchForms.processDiff)(service)(payload);
+  t.deepEqual(service.schema.schema.properties, expected);
 
   t.end();
 });
@@ -8854,15 +8867,18 @@ function clearSchemaDefault(service, schema, key) {
 }
 
 function processDiff(service) {
-  return function (schema) {
-    var updateSchema = schema.params.updateSchema;
+  var schema = service.schema;
+  return function (payload) {
+    var updateSchema = payload.params.updateSchema;
     var links = _.filter(schema.batchConfig.links, function (ls) {
       return _.includes(ls, updateSchema);
     });
     var hardLinks = _.filter(schema.batchConfig.hardLinks, function (ls) {
       return _.includes(ls, updateSchema);
     });
-    processSchemaDiff(service, { type: 'object', properties: schema.diff.schema }, _.flatten(links.concat(hardLinks)));
+    // ;_;
+    Object.assign(service.schema.schema.properties, payload.diff.schema);
+    processSchemaDiff(service, service.schema.schema, _.flatten(links.concat(hardLinks)));
   };
 }
 
