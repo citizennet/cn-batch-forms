@@ -5416,29 +5416,17 @@ var schemaTpl = {
     foo: {
       type: 'object',
       properties: {
-        bar: {
-          default: 12,
-          type: 'integer'
-        },
+        bar: { default: 12, type: 'integer' },
         baz: {
           type: 'array',
-          items: {
-            type: 'string',
-            default: 'default string'
-          }
+          items: { type: 'string', default: 'default string' }
         },
-        far: {
-          type: 'string',
-          default: 'test duplicate key string'
-        },
+        far: { type: 'string', default: 'test duplicate key string' },
         zed: {
           type: 'array',
           items: {
             properties: {
-              jam: {
-                type: 'integer',
-                default: 42
-              }
+              jam: { type: 'integer', default: 42 }
             },
             type: 'object'
           }
@@ -5450,14 +5438,8 @@ var schemaTpl = {
       items: {
         type: 'object',
         properties: {
-          raf: {
-            type: 'string',
-            default: 'simmons'
-          },
-          gat: {
-            type: 'number',
-            default: 9
-          }
+          raf: { type: 'string', default: 'simmons' },
+          gat: { type: 'number', default: 9 }
         }
       }
     }
@@ -5706,29 +5688,17 @@ var schemaTpl = {
     foo: {
       type: 'object',
       properties: {
-        bar: {
-          default: undefined,
-          type: 'integer'
-        },
+        bar: { default: undefined, type: 'integer' },
         baz: {
           type: 'array',
-          items: {
-            type: 'string',
-            default: undefined
-          }
+          items: { type: 'string', default: undefined }
         },
-        far: {
-          type: 'string',
-          default: undefined
-        },
+        far: { type: 'string', default: undefined },
         zed: {
           type: 'array',
           items: {
             properties: {
-              jam: {
-                type: 'integer',
-                default: 42
-              }
+              jam: { type: 'integer', default: 42 }
             },
             type: 'object'
           }
@@ -5740,14 +5710,8 @@ var schemaTpl = {
       items: {
         type: 'object',
         properties: {
-          raf: {
-            type: 'string',
-            default: 'simmons'
-          },
-          gat: {
-            type: 'number',
-            default: 9
-          }
+          raf: { type: 'string', default: 'simmons' },
+          gat: { type: 'number', default: 9 }
         }
       }
     }
@@ -5755,6 +5719,102 @@ var schemaTpl = {
 
   (0, _cnBatchForms.processDiff)(service)(payload);
   t.deepEqual(service.schema.schema.properties, expected);
+
+  t.end();
+});
+
+function modelFactory(val) {
+  return {
+    val: val,
+    set: function set(val) {
+      this.val = val;
+    },
+    get: function get(val) {
+      return this.val;
+    },
+    path: function path() {
+      return { key: 'val' };
+    }
+  };
+}
+
+var setValue_ = (0, _cnBatchForms.setValue)({
+  parseExpression: function parseExpression(key, obj) {
+    return {
+      get: function get() {
+        return obj[key];
+      }
+    };
+  }
+});
+
+(0, _tape2.default)('setValue', function (t) {
+  (0, _tape2.default)('replace', function (t) {
+    var update = modelFactory('');
+    var original = modelFactory();
+    setValue_('ice cream', update, original, 'replace');
+    t.equal(update.get(), 'ice cream');
+    t.end();
+  });
+
+  (0, _tape2.default)('append str', function (t) {
+    var update = modelFactory('');
+    var original = modelFactory('i like');
+    setValue_(' ice cream ', update, original, 'append');
+    t.equal(update.get(), 'i like ice cream');
+    setValue_(undefined, update, original, 'append');
+    t.equal(update.get(), 'i like');
+    t.end();
+  });
+
+  (0, _tape2.default)('append arr', function (t) {
+    var update = modelFactory([]);
+    var original = modelFactory(['i like']);
+    setValue_(['ice cream'], update, original, 'append');
+    t.deepEqual(update.get(), ['i like', 'ice cream']);
+    setValue_(['i like', 'ice cream'], update, original, 'append');
+    t.deepEqual(update.get(), ['i like', 'ice cream']);
+    t.end();
+  });
+
+  (0, _tape2.default)('prepend str', function (t) {
+    var update = modelFactory('');
+    var original = modelFactory('i like');
+    setValue_(' ice cream, ', update, original, 'prepend');
+    t.equal(update.get(), 'ice cream, i like');
+    setValue_(undefined, update, original, 'prepend');
+    t.equal(update.get(), 'i like');
+    t.end();
+  });
+
+  (0, _tape2.default)('prepend arr', function (t) {
+    var update = modelFactory([]);
+    var original = modelFactory(['i like']);
+    setValue_(['ice cream'], update, original, 'prepend');
+    t.deepEqual(update.get(), ['ice cream', 'i like']);
+    setValue_(['i like', 'ice cream'], update, original, 'prepend');
+    t.deepEqual(update.get(), ['i like', 'ice cream']);
+    t.end();
+  });
+
+  (0, _tape2.default)('strReplace', function (t) {
+    var update = modelFactory();
+    var original = modelFactory('i like donuts');
+    setValue_('', update, original, 'stringReplace', {
+      __replace_val: 'donuts',
+      __with_val: 'ice cream'
+    });
+    t.equal(update.get(), 'i like ice cream');
+    setValue_('', update, original, 'stringReplace', {
+      __replace_val: 'donuts'
+    });
+    t.equal(update.get(), 'i like');
+    setValue_('', update, original, 'stringReplace', {
+      __with_val: 'ice cream'
+    });
+    t.equal(update.get(), 'i like donuts');
+    t.end();
+  });
 
   t.end();
 });
@@ -8833,6 +8893,7 @@ Object.defineProperty(exports, "__esModule", {
 exports.clearSchemaDefault = clearSchemaDefault;
 exports.processDiff = processDiff;
 exports.processSchemaDiff = processSchemaDiff;
+exports.setValue = setValue;
 exports.default = cnBatchFormsProvider;
 // Needed for test bundle
 var _ = typeof window !== 'undefined' && window._ || __webpack_require__(69);
@@ -8868,6 +8929,7 @@ function clearSchemaDefault(service, schema, key) {
 
 function processDiff(service) {
   var schema = service.schema;
+
   return function (payload) {
     var updateSchema = payload.params.updateSchema;
     var links = _.filter(schema.batchConfig.links, function (ls) {
@@ -8897,6 +8959,51 @@ function processSchemaDiff(service, schema, links) {
   } else if (schema.type === 'array') {
     processSchemaDiff(service, schema.items, links, key + '[]');
   }
+}
+
+function setValue(ffService) {
+  return function (val, update, original, mode, model) {
+    if (mode === 'replace') {
+      update.set(val);
+    } else if (mode === 'append') {
+      var originalVal = original.get();
+      if (_.isArray(originalVal)) {
+        var uniqVal = _([]).concat(originalVal, val).uniq(function (v) {
+          return v.key || angular.toJson(v);
+        }).value();
+        update.set(uniqVal);
+      } else if (_.isString(originalVal)) {
+        var updateVal = val ? originalVal + ' ' + val.trim() : originalVal;
+        update.set(updateVal);
+      } else {
+        update.set(val);
+      }
+    } else if (mode === 'prepend') {
+      var _originalVal = original.get();
+      if (_.isArray(_originalVal)) {
+        var _uniqVal = _([]).concat(val, _originalVal).uniq(function (v) {
+          return v.key || angular.toJson(v);
+        }).value();
+        update.set(_uniqVal);
+      } else if (_.isString(_originalVal)) {
+        var _updateVal = val ? val.trim() + ' ' + _originalVal : _originalVal;
+        update.set(_updateVal);
+      } else {
+        update.set(val);
+      }
+    } else if (mode === 'increase') {
+      update.set(_.add(original.get() || 0, val));
+    } else if (mode === 'decrease') {
+      update.set(_.subtract(original.get() || 0, val));
+    } else if (mode === 'stringReplace' && original.get()) {
+      var key = original.path().key;
+      var replaceStr = ffService.parseExpression('__replace_' + key, model).get();
+      var replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
+      var withStr = ffService.parseExpression('__with_' + key, model).get() || '';
+      var _updateVal2 = replaceStr ? original.get().replace(replaceExp, withStr).trim() : original.get();
+      update.set(_updateVal2);
+    }
+  };
 }
 
 function cnBatchFormsProvider() {
@@ -8966,7 +9073,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       resetDefaults: resetDefaults,
       restoreDefaults: restoreDefaults,
       setValidation: setValidation,
-      setValue: setValue,
+      setValue: setValue(cnFlexFormService),
       showResults: showResults
     }).constructor(schema, model, models);
   }
@@ -9412,61 +9519,12 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           var update = cnFlexFormService.parseExpression(key, models[i]);
           var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
 
-          _this6.setValue(_val, update, original, mode);
+          _this6.setValue(_val, update, original, mode, _this6.model);
         }
       });
     });
 
     return models;
-  }
-
-  function setValue(val, update, original, mode) {
-    if (mode === 'replace') {
-      update.set(val);
-    } else if (mode === 'append') {
-      var originalVal = original.get();
-      if (_.isArray(originalVal)) {
-        var uniqVal = _([]).concat(originalVal, val).uniq(function (value) {
-          return value.key || angular.toJson(value);
-        }).value();
-
-        update.set(uniqVal);
-      } else if (_.isString(originalVal)) {
-        update.set(originalVal + ' ' + val.trim());
-      } else {
-        update.set(val);
-      }
-    } else if (mode === 'prepend') {
-      var _originalVal = original.get();
-      if (_.isArray(_originalVal)) {
-        update.set(val.concat(_originalVal));
-      } else if (_.isString(_originalVal)) {
-        update.set(val.trim() + ' ' + _originalVal);
-      } else {
-        update.set(val);
-      }
-    } else if (mode === 'increase') {
-      update.set(_.add(original.get() || 0, val));
-    } else if (mode === 'decrease') {
-      update.set(_.subtract(original.get() || 0, val));
-    } else if (mode === 'stringReplace' && original.get()) {
-      var key = original.path().key;
-      var replaceString = cnFlexFormService.parseExpression('_replace_' + key, this.model);
-      var withString = cnFlexFormService.parseExpression('_with_' + key, this.model);
-      var expression = new RegExp(_.escapeRegExp(replaceString.get()), "gi");
-      update.set(original.get().replace(expression, withString.get()));
-    }
-    /* This needs work, _.find(val, item) might not work because the
-       the items we're comparing might have the same id but one might
-       have different properties
-    else if(mode === 'remove') {
-      original.get().forEach(item => {
-        if(!_.find(val, item)) {
-          update = _.reject(update, item);
-        }
-      });
-    }
-    */
   }
 
   function setPlaceholder(field, val) {
@@ -9511,8 +9569,8 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     if (config.editModes.includes('stringReplace')) {
       var dirtyCheck = this.createDirtyCheck(field);
       var configKey = '__batchConfig["' + (field.key || field.batchConfig.key) + '"]';
-      var replaceKey = '_replace_' + (field.key || field.batchConfig.key);
-      var withKey = '_with_' + (field.key || field.batchConfig.key);
+      var replaceKey = '__replace_' + (field.key || field.batchConfig.key);
+      var withKey = '__with_' + (field.key || field.batchConfig.key);
       var stringReplaceField = {
         type: 'component',
         items: [{

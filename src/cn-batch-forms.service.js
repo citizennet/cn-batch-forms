@@ -32,6 +32,7 @@ export function clearSchemaDefault(service, schema, key) {
 }
 
 export function processDiff(service) {
+  const { schema } = service;
   return payload => {
     const updateSchema = payload.params.updateSchema;
     const links = _.filter(schema.batchConfig.links, ls => _.includes(ls, updateSchema));
@@ -57,6 +58,68 @@ export function processSchemaDiff(service, schema, links, key="") {
   } else if (schema.type === 'array') {
     processSchemaDiff(service, schema.items, links, `${key}[]`)
   }
+}
+
+export function setValue(ffService) {
+  return function(val, update, original, mode, model) {
+    if(mode === 'replace') {
+      update.set(val);
+    }
+    else if(mode === 'append') {
+      let originalVal = original.get();
+      if(_.isArray(originalVal)) {
+        const uniqVal = _([])
+          .concat(originalVal, val)
+          .uniq(v => v.key || angular.toJson(v))
+          .value();
+        update.set(uniqVal);
+      }
+      else if(_.isString(originalVal)) {
+        const updateVal = val ?
+          `${originalVal} ${val.trim()}` :
+          originalVal;
+        update.set(updateVal);
+      }
+      else {
+        update.set(val);
+      }
+    }
+    else if(mode === 'prepend') {
+      let originalVal = original.get();
+      if(_.isArray(originalVal)) {
+        const uniqVal = _([])
+          .concat(val, originalVal)
+          .uniq(v => v.key || angular.toJson(v))
+          .value();
+        update.set(uniqVal);
+      }
+      else if(_.isString(originalVal)) {
+        const updateVal = val ?
+          `${val.trim()} ${originalVal}` :
+          originalVal;
+        update.set(updateVal);
+      }
+      else {
+        update.set(val);
+      }
+    }
+    else if(mode === 'increase') {
+      update.set(_.add(original.get() || 0, val));
+    }
+    else if(mode === 'decrease') {
+      update.set(_.subtract(original.get() || 0, val));
+    }
+    else if(mode === 'stringReplace' && original.get()) {
+      const key = original.path().key;
+      const replaceStr = ffService.parseExpression(`__replace_${key}`, model).get();
+      const replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
+      const withStr = ffService.parseExpression(`__with_${key}`, model).get() || '';
+      const updateVal = replaceStr ?
+        original.get().replace(replaceExp, withStr).trim() :
+        original.get();
+      update.set(updateVal);
+    }
+  };
 }
 
 export default function cnBatchFormsProvider() {
@@ -133,7 +196,7 @@ function cnBatchForms(
       resetDefaults,
       restoreDefaults,
       setValidation,
-      setValue,
+      setValue: setValue(cnFlexFormService),
       showResults
     }).constructor(schema, model, models);
   }
@@ -579,71 +642,12 @@ function cnBatchForms(
           let update = cnFlexFormService.parseExpression(key, models[i]);
           let original = cnFlexFormService.parseExpression(key, this.models[i]);
 
-          this.setValue(val, update, original, mode);
+          this.setValue(val, update, original, mode, this.model);
         }
       });
     });
 
     return models;
-  }
-
-  function setValue(val, update, original, mode) {
-    if(mode === 'replace') {
-      update.set(val);
-    }
-    else if(mode === 'append') {
-      let originalVal = original.get();
-      if(_.isArray(originalVal)) {
-        const uniqVal = _([])
-          .concat(originalVal, val)
-          .uniq((value) => value.key || angular.toJson(value))
-          .value();
-
-        update.set(uniqVal);
-      }
-      else if(_.isString(originalVal)) {
-        update.set(`${originalVal} ${val.trim()}`);
-      }
-      else {
-        update.set(val);
-      }
-    }
-    else if(mode === 'prepend') {
-      let originalVal = original.get();
-      if(_.isArray(originalVal)) {
-        update.set(val.concat(originalVal));
-      }
-      else if(_.isString(originalVal)) {
-        update.set(`${val.trim()} ${originalVal}`);
-      }
-      else {
-        update.set(val);
-      }
-    }
-    else if(mode === 'increase') {
-      update.set(_.add(original.get() || 0, val));
-    }
-    else if(mode === 'decrease') {
-      update.set(_.subtract(original.get() || 0, val));
-    }
-    else if(mode === 'stringReplace' && original.get()) {
-      let key = original.path().key;
-      let replaceString = cnFlexFormService.parseExpression(`_replace_${key}`, this.model);
-      let withString = cnFlexFormService.parseExpression(`_with_${key}`, this.model);
-      let expression = new RegExp(_.escapeRegExp(replaceString.get()), "gi");
-      update.set(original.get().replace(expression, withString.get()));
-    }
-    /* This needs work, _.find(val, item) might not work because the
-       the items we're comparing might have the same id but one might
-       have different properties
-    else if(mode === 'remove') {
-      original.get().forEach(item => {
-        if(!_.find(val, item)) {
-          update = _.reject(update, item);
-        }
-      });
-    }
-    */
   }
 
   function setPlaceholder(field, val) {
@@ -687,8 +691,8 @@ function cnBatchForms(
     if(config.editModes.includes('stringReplace')) {
       const dirtyCheck = this.createDirtyCheck(field);
       let configKey = `__batchConfig["${field.key || field.batchConfig.key}"]`;
-      let replaceKey = `_replace_${field.key || field.batchConfig.key}`;
-      let withKey = `_with_${field.key || field.batchConfig.key}`;
+      let replaceKey = `__replace_${field.key || field.batchConfig.key}`;
+      let withKey = `__with_${field.key || field.batchConfig.key}`;
       let stringReplaceField = {
         type: 'component',
         items: [
