@@ -5750,7 +5750,7 @@ var setValue_ = (0, _cnBatchForms.setValue)({
 
 (0, _tape2.default)('setValue', function (t) {
   (0, _tape2.default)('replace', function (t) {
-    var update = modelFactory('');
+    var update = modelFactory();
     var original = modelFactory();
     setValue_('ice cream', update, original, 'replace');
     t.equal(update.get(), 'ice cream');
@@ -5758,7 +5758,7 @@ var setValue_ = (0, _cnBatchForms.setValue)({
   });
 
   (0, _tape2.default)('append str', function (t) {
-    var update = modelFactory('');
+    var update = modelFactory();
     var original = modelFactory('i like');
     setValue_(' ice cream ', update, original, 'append');
     t.equal(update.get(), 'i like ice cream');
@@ -5768,7 +5768,7 @@ var setValue_ = (0, _cnBatchForms.setValue)({
   });
 
   (0, _tape2.default)('append arr', function (t) {
-    var update = modelFactory([]);
+    var update = modelFactory();
     var original = modelFactory(['i like']);
     setValue_(['ice cream'], update, original, 'append');
     t.deepEqual(update.get(), ['i like', 'ice cream']);
@@ -5778,7 +5778,7 @@ var setValue_ = (0, _cnBatchForms.setValue)({
   });
 
   (0, _tape2.default)('prepend str', function (t) {
-    var update = modelFactory('');
+    var update = modelFactory();
     var original = modelFactory('i like');
     setValue_(' ice cream, ', update, original, 'prepend');
     t.equal(update.get(), 'ice cream, i like');
@@ -5788,7 +5788,7 @@ var setValue_ = (0, _cnBatchForms.setValue)({
   });
 
   (0, _tape2.default)('prepend arr', function (t) {
-    var update = modelFactory([]);
+    var update = modelFactory();
     var original = modelFactory(['i like']);
     setValue_(['ice cream'], update, original, 'prepend');
     t.deepEqual(update.get(), ['ice cream', 'i like']);

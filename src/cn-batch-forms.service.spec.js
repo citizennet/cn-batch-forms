@@ -365,7 +365,7 @@ const setValue_ = setValue({
 
 test('setValue', t => {
   test('replace', t => {
-    const update = modelFactory('')
+    const update = modelFactory()
     const original = modelFactory()
     setValue_('ice cream', update, original, 'replace')
     t.equal(update.get(), 'ice cream')
@@ -373,7 +373,7 @@ test('setValue', t => {
   })
 
   test('append str', t => {
-    const update = modelFactory('')
+    const update = modelFactory()
     const original = modelFactory('i like')
     setValue_(' ice cream ', update, original, 'append')
     t.equal(update.get(), 'i like ice cream')
@@ -383,7 +383,7 @@ test('setValue', t => {
   })
 
   test('append arr', t => {
-    const update = modelFactory([])
+    const update = modelFactory()
     const original = modelFactory(['i like'])
     setValue_(['ice cream'], update, original, 'append')
     t.deepEqual(update.get(), ['i like', 'ice cream'])
@@ -393,7 +393,7 @@ test('setValue', t => {
   })
 
   test('prepend str', t => {
-    const update = modelFactory('')
+    const update = modelFactory()
     const original = modelFactory('i like')
     setValue_(' ice cream, ', update, original, 'prepend')
     t.equal(update.get(), 'ice cream, i like')
@@ -403,7 +403,7 @@ test('setValue', t => {
   })
 
   test('prepend arr', t => {
-    const update = modelFactory([])
+    const update = modelFactory()
     const original = modelFactory(['i like'])
     setValue_(['ice cream'], update, original, 'prepend')
     t.deepEqual(update.get(), ['ice cream', 'i like'])
