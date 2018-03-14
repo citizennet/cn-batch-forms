@@ -327,6 +327,7 @@ function cnBatchForms(
         if(field.items) {
           const externalFields = _(field.items)
             .filter(x => x.key && !x.key.includes(field.key))
+            .map(x => _.assign(x, { parent: field.key, batchConfig: { default: field.batchConfig.default } }))
             .value();
           _.forEach(externalFields, processField.bind(this))
           _.forEach(externalFields, createBatchField.bind(this))
@@ -609,19 +610,15 @@ function cnBatchForms(
     let models = [];
 
     _.each(this.fieldRegister, (register, key) => {
+      let configKey = register.field.parent ? register.field.parent : key;
       let dirty = cnFlexFormService
-          .parseExpression(`__dirtyCheck["${key}"]`, this.model)
+          .parseExpression(`__dirtyCheck["${configKey}"]`, this.model)
           .get();
 
-      let dirtyField = register.field.batchConfig && register.field.batchConfig.dirtyField &&
-        cnFlexFormService
-          .parseExpression(`__dirtyCheck["${register.field.batchConfig.dirtyField}"]`, this.model)
-          .get()
-
-      if(!dirty && !dirtyField) return;
+      if(!dirty) return;
 
       let mode = cnFlexFormService
-          .parseExpression(`__batchConfig["${key}"]`, this.model)
+          .parseExpression(`__batchConfig["${configKey}"]`, this.model)
           .get();
 
       this.models.forEach((model, i) => {
