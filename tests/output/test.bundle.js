@@ -9199,6 +9199,14 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           cnFlexFormService.parseExpression(key, this.model).set(first);
         }
 
+        if (field.items) {
+          var externalFields = _(field.items).filter(function (x) {
+            return x.key && !x.key.includes(field.key);
+          }).value();
+          _.forEach(externalFields, processField.bind(this));
+          _.forEach(externalFields, createBatchField.bind(this));
+        }
+
         return handler.bind(this)(field);
       } else return false;
     }
@@ -9491,7 +9499,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     _.each(this.fieldRegister, function (register, key) {
       var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this6.model).get();
 
-      if (!dirty) return;
+      var dirtyField = register.field.batchConfig && register.field.batchConfig.dirtyField && cnFlexFormService.parseExpression('__dirtyCheck["' + register.field.batchConfig.dirtyField + '"]', _this6.model).get();
+
+      if (!dirty && !dirtyField) return;
 
       var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this6.model).get();
 

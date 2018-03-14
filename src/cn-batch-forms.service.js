@@ -324,6 +324,14 @@ function cnBatchForms(
           cnFlexFormService.parseExpression(key, this.model).set(first);
         }
 
+        if(field.items) {
+          const externalFields = _(field.items)
+            .filter(x => x.key && !x.key.includes(field.key))
+            .value();
+          _.forEach(externalFields, processField.bind(this))
+          _.forEach(externalFields, createBatchField.bind(this))
+        }
+
         return handler.bind(this)(field);
       }
       else return false;
@@ -605,7 +613,12 @@ function cnBatchForms(
           .parseExpression(`__dirtyCheck["${key}"]`, this.model)
           .get();
 
-      if(!dirty) return;
+      let dirtyField = register.field.batchConfig && register.field.batchConfig.dirtyField &&
+        cnFlexFormService
+          .parseExpression(`__dirtyCheck["${register.field.batchConfig.dirtyField}"]`, this.model)
+          .get()
+
+      if(!dirty && !dirtyField) return;
 
       let mode = cnFlexFormService
           .parseExpression(`__batchConfig["${key}"]`, this.model)
@@ -875,7 +888,7 @@ function cnBatchForms(
     });
   }
 
-  
+
   function showResults(results, config) {
     this.results = results;
     this.resultsConfig = config;
