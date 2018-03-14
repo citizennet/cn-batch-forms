@@ -531,6 +531,16 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           cnFlexFormService.parseExpression(key, this.model).set(first);
         }
 
+        if (field.items) {
+          var externalFields = _(field.items).filter(function (x) {
+            return x.key && !x.key.includes(field.key);
+          }).map(function (x) {
+            return _.assign(x, { parent: field.key, batchConfig: { default: field.batchConfig.default } });
+          }).value();
+          _.forEach(externalFields, processField.bind(this));
+          _.forEach(externalFields, createBatchField.bind(this));
+        }
+
         return handler.bind(this)(field);
       } else return false;
     }
@@ -821,11 +831,12 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     var models = [];
 
     _.each(this.fieldRegister, function (register, key) {
-      var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this6.model).get();
+      var configKey = register.field.parent ? register.field.parent : key;
+      var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + configKey + '"]', _this6.model).get();
 
       if (!dirty) return;
 
-      var mode = cnFlexFormService.parseExpression('__batchConfig["' + key + '"]', _this6.model).get();
+      var mode = cnFlexFormService.parseExpression('__batchConfig["' + configKey + '"]', _this6.model).get();
 
       _this6.models.forEach(function (model, i) {
         models[i] = models[i] || {};
