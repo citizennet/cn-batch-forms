@@ -3,7 +3,8 @@ import test from 'tape'
 import {
   clearSchemaDefault,
   processDiff,
-  setValue
+  setValue,
+  processCondition
 } from './cn-batch-forms.service'
 
 const schemaTpl = {
@@ -428,6 +429,76 @@ test('setValue', t => {
       __with_val: 'ice cream',
     })
     t.equal(update.get(), 'i like donuts')
+    t.end()
+  })
+
+  t.end()
+})
+
+test('processCondition', t => {
+  test('truthy', t => {
+    t.equal(
+      processCondition("model.enableDailyBudget"),
+      "(model.enableDailyBudget === undefined ? "
+      + "model.__ogValues[\"enableDailyBudget\"] : "
+      + "model.enableDailyBudget)"
+    )
+    t.end()
+  })
+
+  test('equality', t => {
+    t.equal(
+      processCondition("model.admin.type === 'CONVERSIONS'"),
+      "(model.admin.type === undefined ? "
+      + "model.__ogValues[\"admin.type\"] : model.admin.type)"
+      + " === 'CONVERSIONS'"
+    )
+    t.end()
+  })
+
+  test('binary', t => {
+    t.equal(
+      processCondition(
+        "model.type === 'PAGE_LIKES' || model.type === 'OFFER_CLAIMS'"
+      ),
+      "(model.type === undefined ? "
+      + "model.__ogValues[\"type\"] : model.type)"
+      + " === 'PAGE_LIKES' || "
+      + "(model.type === undefined ? "
+      + "model.__ogValues[\"type\"] : model.type)"
+      + " === 'OFFER_CLAIMS'"
+    )
+    t.end()
+  })
+
+  test('comparison', t => {
+    t.equal(
+      processCondition("model.startDate > model.stopDate"),
+      "(model.startDate === undefined ? "
+      + "model.__ogValues[\"startDate\"] : model.startDate)"
+      + " > (model.stopDate === undefined ? "
+      + "model.__ogValues[\"stopDate\"] : model.stopDate)"
+    )
+    t.end()
+  })
+
+  test('inner function', t => {
+    t.equal(
+      processCondition("model.admin.positions.includes('stream')"),
+      "(model.admin.positions === undefined ? "
+      + "model.__ogValues[\"admin.positions\"].includes('stream') : "
+      + "model.admin.positions.includes('stream'))"
+    )
+    t.end()
+  })
+
+  test('inner function compare', t => {
+    t.equal(
+      processCondition("model.admin.positions.indexOf('stream') > -1"),
+      "(model.admin.positions === undefined ? "
+      + "model.__ogValues[\"admin.positions\"].indexOf('stream') : "
+      + "model.admin.positions.indexOf('stream')) > -1"
+    )
     t.end()
   })
 
