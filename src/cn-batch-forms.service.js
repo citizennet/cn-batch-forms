@@ -122,6 +122,20 @@ export function setValue(ffService) {
   };
 }
 
+export function processCondition(condition) {
+  if(!condition) return condition;
+  const fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/)
+  return fnMatch ?
+    `(${fnMatch[1]}.${fnMatch[2]} === undefined ?
+      ${fnMatch[1]}.__ogValues["${fnMatch[2]}"].${fnMatch[3]} :
+      ${fnMatch[1]}.${fnMatch[2]}.${fnMatch[3]})
+      ${fnMatch[4]}`.trim().replace(/\s+/g, ' ') :
+    condition.replace(
+      /\b(model)\.(\S*)\b/g,
+      '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)'
+    );
+}
+
 export default function cnBatchFormsProvider() {
   return {
     registerField,
@@ -291,10 +305,6 @@ function cnBatchForms(
       }
       --i;
     }
-  }
-
-  function processCondition(condition) {
-    return condition && condition.replace(/\b(model)\.(\S*)\b/g, '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)');
   }
 
   function processField(field) {
