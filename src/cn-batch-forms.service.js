@@ -44,6 +44,10 @@ export function processDiff(service) {
       service.schema.schema,
       _.flatten(links.concat(hardLinks))
     );
+    processFormDiff(
+      service,
+      payload.diff.form
+    );
   }
 }
 
@@ -58,6 +62,19 @@ export function processSchemaDiff(service, schema, links, key="") {
   } else if (schema.type === 'array') {
     processSchemaDiff(service, schema.items, links, `${key}[]`)
   }
+}
+
+export function processFormDiff(service, updates) {
+  _.each(updates, (update, key) => {
+    if (!update.batchConfig) return;
+    const forms = service.getFormFromRegister(key);
+    _.each(forms, ({ wrapper }) => {
+      if (wrapper && _.has(update, 'condition')) {
+        wrapper.condition = processCondition(update.condition);
+        delete update.condition;
+      }
+    });
+  });
 }
 
 export function setValue(ffService) {
@@ -297,6 +314,7 @@ function cnBatchForms(
           if(!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
           this.fieldRegister[child.key].field = child;
           this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
+          this.fieldRegister[child.key].wrapper = fields[i];
         }
       }
       if(!child) {
