@@ -225,7 +225,9 @@ Object.defineProperty(exports, "__esModule", {
 exports.clearSchemaDefault = clearSchemaDefault;
 exports.processDiff = processDiff;
 exports.processSchemaDiff = processSchemaDiff;
+exports.processFormDiff = processFormDiff;
 exports.setValue = setValue;
+exports.processCondition = processCondition;
 exports.default = cnBatchFormsProvider;
 // Needed for test bundle
 var _ = typeof window !== 'undefined' && window._ || __webpack_require__(4);
@@ -273,6 +275,7 @@ function processDiff(service) {
     // ;_;
     Object.assign(service.schema.schema.properties, payload.diff.schema);
     processSchemaDiff(service, service.schema.schema, _.flatten(links.concat(hardLinks)));
+    processFormDiff(service, payload.diff.form);
   };
 }
 
@@ -291,6 +294,21 @@ function processSchemaDiff(service, schema, links) {
   } else if (schema.type === 'array') {
     processSchemaDiff(service, schema.items, links, key + '[]');
   }
+}
+
+function processFormDiff(service, updates) {
+  _.each(updates, function (update, key) {
+    if (!update.batchConfig) return;
+    var forms = service.getFormFromRegister(key);
+    _.each(forms, function (_ref) {
+      var wrapper = _ref.wrapper;
+
+      if (wrapper && _.has(update, 'condition')) {
+        wrapper.condition = processCondition(update.condition);
+        delete update.condition;
+      }
+    });
+  });
 }
 
 function setValue(ffService) {
@@ -336,6 +354,12 @@ function setValue(ffService) {
       update.set(_updateVal2);
     }
   };
+}
+
+function processCondition(condition) {
+  if (!condition) return condition;
+  var fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/);
+  return fnMatch ? ('(' + fnMatch[1] + '.' + fnMatch[2] + ' === undefined ?\n      ' + fnMatch[1] + '.__ogValues["' + fnMatch[2] + '"].' + fnMatch[3] + ' :\n      ' + fnMatch[1] + '.' + fnMatch[2] + '.' + fnMatch[3] + ')\n      ' + fnMatch[4]).trim().replace(/\s+/g, ' ') : condition.replace(/\b(model)\.(\S*)\b/g, '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)');
 }
 
 function cnBatchFormsProvider() {
@@ -490,6 +514,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
           this.fieldRegister[child.key].field = child;
           this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
+          this.fieldRegister[child.key].wrapper = fields[i];
         }
       }
       if (!child) {
@@ -498,10 +523,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       }
       --i;
     }
-  }
-
-  function processCondition(condition) {
-    return condition && condition.replace(/\b(model)\.(\S*)\b/g, '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)');
   }
 
   function processField(field) {

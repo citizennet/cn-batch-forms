@@ -44,6 +44,10 @@ export function processDiff(service) {
       service.schema.schema,
       _.flatten(links.concat(hardLinks))
     );
+    processFormDiff(
+      service,
+      payload.diff.form
+    );
   }
 }
 
@@ -58,6 +62,19 @@ export function processSchemaDiff(service, schema, links, key="") {
   } else if (schema.type === 'array') {
     processSchemaDiff(service, schema.items, links, `${key}[]`)
   }
+}
+
+export function processFormDiff(service, updates) {
+  _.each(updates, (update, key) => {
+    if (!update.batchConfig) return;
+    const forms = service.getFormFromRegister(key);
+    _.each(forms, ({ wrapper }) => {
+      if (wrapper && _.has(update, 'condition')) {
+        wrapper.condition = processCondition(update.condition);
+        delete update.condition;
+      }
+    });
+  });
 }
 
 export function setValue(ffService) {
@@ -120,6 +137,20 @@ export function setValue(ffService) {
       update.set(updateVal);
     }
   };
+}
+
+export function processCondition(condition) {
+  if(!condition) return condition;
+  const fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/)
+  return fnMatch ?
+    `(${fnMatch[1]}.${fnMatch[2]} === undefined ?
+      ${fnMatch[1]}.__ogValues["${fnMatch[2]}"].${fnMatch[3]} :
+      ${fnMatch[1]}.${fnMatch[2]}.${fnMatch[3]})
+      ${fnMatch[4]}`.trim().replace(/\s+/g, ' ') :
+    condition.replace(
+      /\b(model)\.(\S*)\b/g,
+      '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)'
+    );
 }
 
 export default function cnBatchFormsProvider() {
@@ -283,6 +314,7 @@ function cnBatchForms(
           if(!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
           this.fieldRegister[child.key].field = child;
           this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
+          this.fieldRegister[child.key].wrapper = fields[i];
         }
       }
       if(!child) {
@@ -291,10 +323,6 @@ function cnBatchForms(
       }
       --i;
     }
-  }
-
-  function processCondition(condition) {
-    return condition && condition.replace(/\b(model)\.(\S*)\b/g, '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)');
   }
 
   function processField(field) {
