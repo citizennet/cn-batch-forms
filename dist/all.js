@@ -225,6 +225,7 @@ Object.defineProperty(exports, "__esModule", {
 exports.clearSchemaDefault = clearSchemaDefault;
 exports.processDiff = processDiff;
 exports.processSchemaDiff = processSchemaDiff;
+exports.processFormDiff = processFormDiff;
 exports.setValue = setValue;
 exports.processCondition = processCondition;
 exports.default = cnBatchFormsProvider;
@@ -274,6 +275,7 @@ function processDiff(service) {
     // ;_;
     Object.assign(service.schema.schema.properties, payload.diff.schema);
     processSchemaDiff(service, service.schema.schema, _.flatten(links.concat(hardLinks)));
+    processFormDiff(service, payload.diff.form);
   };
 }
 
@@ -292,6 +294,21 @@ function processSchemaDiff(service, schema, links) {
   } else if (schema.type === 'array') {
     processSchemaDiff(service, schema.items, links, key + '[]');
   }
+}
+
+function processFormDiff(service, updates) {
+  _.each(updates, function (update, key) {
+    if (!update.batchConfig) return;
+    var forms = service.getFormFromRegister(key);
+    _.each(forms, function (_ref) {
+      var wrapper = _ref.wrapper;
+
+      if (wrapper && _.has(update, 'condition')) {
+        wrapper.condition = processCondition(update.condition);
+        delete update.condition;
+      }
+    });
+  });
 }
 
 function setValue(ffService) {
@@ -497,6 +514,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           if (!this.fieldRegister[child.key]) this.fieldRegister[child.key] = {};
           this.fieldRegister[child.key].field = child;
           this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
+          this.fieldRegister[child.key].wrapper = fields[i];
         }
       }
       if (!child) {
