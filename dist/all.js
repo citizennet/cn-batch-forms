@@ -362,6 +362,11 @@ function processCondition(condition) {
   console.log(condition);
   console.log(condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/));
   var fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/);
+  // (
+  //   model.admin === undefined ?
+  //   model.__ogValues["admin"].enable_special_ad_categories == false || !(model.admin.special_ad_categories.includes('HOUSING') 
+  //   : model.admin.enable_special_ad_categories == false || !  (model.admin.special_ad_categories.includes('HOUSING')) || model.admin.special_ad_categories.includes('CREDIT') || model.admin.special_ad_categories.includes('EMPLOYMENT')
+  // )
   return fnMatch ? ('(' + fnMatch[1] + '.' + fnMatch[2] + ' === undefined ?\n      ' + fnMatch[1] + '.__ogValues["' + fnMatch[2] + '"].' + fnMatch[3] + ' :\n      ' + fnMatch[1] + '.' + fnMatch[2] + '.' + fnMatch[3] + ')\n      ' + fnMatch[4]).trim().replace(/\s+/g, ' ') : condition.replace(/\b(model)\.(\S*)\b/g, '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)');
 }
 
