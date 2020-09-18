@@ -153,7 +153,6 @@ function processCondition(condition) {
   console.log(condition);
   console.log(condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/));
   var fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/);
-  console.log("(".concat(fnMatch[1], ".").concat(fnMatch[2], " === undefined ?\n    ").concat(fnMatch[1], ".__ogValues[\"").concat(fnMatch[2], "\"].").concat(fnMatch[3], " :\n    ").concat(fnMatch[1], ".").concat(fnMatch[2], ".").concat(fnMatch[3], ")\n    ").concat(fnMatch[4]).trim().replace(/\s+/g, ' '));
   return fnMatch ? "(".concat(fnMatch[1], ".").concat(fnMatch[2], " === undefined ?\n      ").concat(fnMatch[1], ".__ogValues[\"").concat(fnMatch[2], "\"].").concat(fnMatch[3], " :\n      ").concat(fnMatch[1], ".").concat(fnMatch[2], ".").concat(fnMatch[3], ")\n      ").concat(fnMatch[4]).trim().replace(/\s+/g, ' ') : condition.replace(/\b(model)\.(\S*)\b/g, '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)');
 }
 
