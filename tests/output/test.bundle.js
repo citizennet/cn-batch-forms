@@ -9492,6 +9492,7 @@ function processCondition(condition) {
   console.log(condition);
   console.log(condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/));
   var fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/);
+  console.log(fnMatch);
   // (
   //   model.admin === undefined ?
   //   model.__ogValues["admin"].enable_special_ad_categories == false || !(model.admin.special_ad_categories.includes('HOUSING') 
