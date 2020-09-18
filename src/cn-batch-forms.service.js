@@ -140,6 +140,8 @@ export function setValue(ffService) {
 }
 
 export function processCondition(condition) {
+  console.log('processCondition');
+  console.log(condition);
   if(!condition) return condition;
   const fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/)
   return fnMatch ?
