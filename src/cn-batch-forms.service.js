@@ -140,10 +140,15 @@ export function setValue(ffService) {
 }
 
 export function processCondition(condition) {
+  if(!condition) return condition;
   console.log('processCondition');
   console.log(condition);
-  if(!condition) return condition;
+  console.log(condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/))
   const fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/)
+  console.log(`(${fnMatch[1]}.${fnMatch[2]} === undefined ?
+    ${fnMatch[1]}.__ogValues["${fnMatch[2]}"].${fnMatch[3]} :
+    ${fnMatch[1]}.${fnMatch[2]}.${fnMatch[3]})
+    ${fnMatch[4]}`.trim().replace(/\s+/g, ' '))
   return fnMatch ?
     `(${fnMatch[1]}.${fnMatch[2]} === undefined ?
       ${fnMatch[1]}.__ogValues["${fnMatch[2]}"].${fnMatch[3]} :
