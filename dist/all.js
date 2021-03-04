@@ -477,7 +477,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   function onFieldScope(event, scope) {
     var key = cnFlexFormService.getKey(scope.form.key);
 
-    if (!key.startsWith('__')) {
+    if (key && !key.startsWith('__')) {
       if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
       var register = this.fieldRegister[key];
       register.ngModel = scope.ngModel;
@@ -487,7 +487,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     }
 
     // prevent edit mode radiobuttons from setting form to dirty
-    else if (scope.form.key[0] === '__batchConfig') {
+    else if (key && scope.form.key[0] === '__batchConfig') {
         scope.ngModel.$pristine = false;
       }
   }
@@ -590,7 +590,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
             resolution: 'model.__batchConfig["' + child.key + '"] = model.__batchConfig["' + field.batchConfig.key + '"]'
           });
           //item.items[2].condition = 'false';
-          item.items[2].htmlClass = 'hide';
+          if (item.items.lenth > 2) {
+            item.items[2].htmlClass = 'hide';
+          }
         });
       }
     }
@@ -18248,9 +18250,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
     // Define as an anonymous module so, through path mapping, it can be
     // referenced as the "underscore" module.
-    !(__WEBPACK_AMD_DEFINE_RESULT__ = function() {
+    !(__WEBPACK_AMD_DEFINE_RESULT__ = (function() {
       return _;
-    }.call(exports, __webpack_require__, exports, module),
+    }).call(exports, __webpack_require__, exports, module),
 				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
   }
   // Check for `exports` after `define` in case a build optimizer adds it.
