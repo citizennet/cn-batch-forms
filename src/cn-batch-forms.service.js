@@ -874,7 +874,6 @@ function cnBatchForms(
           }
         }
 
-
         let stringReplaceField = {
           type: 'component',
           items: [
