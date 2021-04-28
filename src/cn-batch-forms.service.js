@@ -127,14 +127,33 @@ export function setValue(ffService) {
       update.set(_.subtract(original.get() || 0, val));
     }
     else if(mode === 'stringReplace' && original.get()) {
+      let originalVal = original.get();
       const key = original.path().key;
       const replaceStr = ffService.parseExpression(`__replace_${key}`, model).get();
       const replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
       const withStr = ffService.parseExpression(`__with_${key}`, model).get() || '';
-      const updateVal = replaceStr ?
-        original.get().replace(replaceExp, withStr).trim() :
-        original.get();
-      update.set(updateVal);
+      console.log('-----------------')
+      console.log('replaceStr', replaceStr)
+      console.log('withStr', withStr)
+      console.log('originalVal', originalVal)
+
+      if(_.isArray(originalVal)) {
+        let index = -1;
+        if ((index = _.findIndex(originalVal, {name: replaceStr})) != -1) {
+          originalVal.splice(index, 1, {name: withStr});
+        } else if ((index = _.findIndex(originalVal, {value: replaceStr})) != -1) {
+          originalVal.splice(index, 1, {value: withStr});
+        } else if ((index = _.findIndex(originalVal, replaceStr)) != -1) {
+          originalVal.splice(index, 1, withStr);
+        }
+        update.set(originalVal);
+      } else {
+        const updateVal = replaceStr ?
+          originalVal.replace(replaceExp, withStr).trim() :
+          originalVal;
+        update.set(updateVal);
+      }
+
     }
   };
 }
@@ -142,6 +161,11 @@ export function setValue(ffService) {
 export function processCondition(condition) {
   if(!condition) return condition;
   const fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/)
+  // (
+  //   model.admin === undefined ?
+  //   model.__ogValues["admin"].enable_special_ad_categories == false || !(model.admin.special_ad_categories.includes('HOUSING')
+  //   : model.admin.enable_special_ad_categories == false || !  (model.admin.special_ad_categories.includes('HOUSING')) || model.admin.special_ad_categories.includes('CREDIT') || model.admin.special_ad_categories.includes('EMPLOYMENT')
+  // )
   return fnMatch ?
     `(${fnMatch[1]}.${fnMatch[2]} === undefined ?
       ${fnMatch[1]}.__ogValues["${fnMatch[2]}"].${fnMatch[3]} :
@@ -755,7 +779,6 @@ function cnBatchForms(
       this.addToSchema(replaceKey, { type: 'string' });
       this.addToSchema(withKey, { type: 'string' });
 
-
       return {
         type: 'section',
         condition: field.condition,
@@ -824,8 +847,67 @@ function cnBatchForms(
         remove: () => {
           let val = _.chain(field.batchConfig.ogValues).flatten().uniq().value();
           cnFlexFormService.parseExpression(field.key, this.model).set(val, { silent: true });
-        }
+        },
+        stringReplace: () => {}
       };
+
+      if(config.editModes.includes('stringReplace')) {
+        const dirtyCheck = this.createDirtyCheck(field);
+        let configKey = `__batchConfig["${field.key || field.batchConfig.key}"]`;
+        let replaceKey = `__replace_${field.key || field.batchConfig.key}`;
+        let withKey = `__with_${field.key || field.batchConfig.key}`;
+        let replaceTitleMap = field.batchConfig.replaceTitleMap;
+
+        let replaceItem = {};
+        if (replaceTitleMap) {
+          replaceItem = {
+            key: replaceKey,
+            title: 'Replace',
+            type: 'array',
+            titleMapResolve: replaceTitleMap,
+            watch: {
+              resolution: `model.${dirtyCheck.key} = true`
+            }
+          }
+        } else {
+          replaceItem = {
+            key: replaceKey,
+            title: 'Replace',
+            watch: {
+              resolution: `model.${dirtyCheck.key} = true`
+            }
+          }
+        }
+
+
+        let stringReplaceField = {
+          type: 'component',
+          items: [
+            replaceItem
+            , {
+              key: withKey,
+              title: 'With',
+              watch: {
+                resolution: `model.${dirtyCheck.key} = true`
+              }
+            }
+          ],
+          condition: `model.${configKey} === 'stringReplace'`
+        };
+
+        config.key = field.key;
+
+        this.addToSchema(replaceKey, { type: 'string' });
+        this.addToSchema(withKey, { type: 'string' });
+
+        return {
+          type: 'section',
+          condition: field.condition,
+          batchConfig: config,
+          schema: field.schema,
+          items: [_.extend(field, {condition: `model.${configKey} !== 'stringReplace'`}), stringReplaceField, dirtyCheck]
+        };
+      }
     }
     else {
 
