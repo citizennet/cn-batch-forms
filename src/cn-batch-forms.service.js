@@ -132,10 +132,6 @@ export function setValue(ffService) {
       const replaceStr = ffService.parseExpression(`__replace_${key}`, model).get();
       const replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
       const withStr = ffService.parseExpression(`__with_${key}`, model).get() || '';
-      console.log('-----------------')
-      console.log('replaceStr', replaceStr)
-      console.log('withStr', withStr)
-      console.log('originalVal', originalVal)
 
       if(_.isArray(originalVal)) {
         let index = -1;
