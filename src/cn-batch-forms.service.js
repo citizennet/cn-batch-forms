@@ -291,7 +291,7 @@ function cnBatchForms(
   function onFieldScope(event, scope) {
     let key = cnFlexFormService.getKey(scope.form.key);
 
-    if(!key.startsWith('__')) {
+    if(key && !key.startsWith('__')) {
       if(!this.fieldRegister[key]) this.fieldRegister[key] = {};
       const register = this.fieldRegister[key];
       register.ngModel = scope.ngModel;
@@ -301,7 +301,7 @@ function cnBatchForms(
     }
 
     // prevent edit mode radiobuttons from setting form to dirty
-    else if(scope.form.key[0] === '__batchConfig') {
+    else if(key && scope.form.key[0] === '__batchConfig') {
       scope.ngModel.$pristine = false;
     }
   }
@@ -405,7 +405,9 @@ function cnBatchForms(
             resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
           });
           //item.items[2].condition = 'false';
-          item.items[2].htmlClass = 'hide';
+          if(item.items.lenth > 2) {
+            item.items[2].htmlClass = 'hide';
+					}
         });
       }
     }
