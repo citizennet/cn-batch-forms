@@ -132,13 +132,14 @@ export function setValue(ffService) {
       const replaceStr = ffService.parseExpression(`__replace_${key}`, model).get();
       const replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
       const withStr = ffService.parseExpression(`__with_${key}`, model).get() || '';
-
       if(_.isArray(originalVal)) {
         let index = -1;
         if ((index = _.findIndex(originalVal, {name: replaceStr})) != -1) {
           originalVal.splice(index, 1, {name: withStr});
         } else if ((index = _.findIndex(originalVal, {value: replaceStr})) != -1) {
           originalVal.splice(index, 1, {value: withStr});
+        } else if ((index = _.findIndex(originalVal, {tagName: replaceStr})) != -1) {
+          originalVal.splice(index, 1, {tagName: withStr});
         } else if ((index = _.findIndex(originalVal, replaceStr)) != -1) {
           originalVal.splice(index, 1, withStr);
         }
@@ -355,7 +356,6 @@ function cnBatchForms(
 
       let fieldType = cnFlexFormTypes.getFieldType(field);
       let handler = fieldTypeHandlers[fieldType];
-
       if(handler) {
         if(_.isString(handler)) handler = this[handler];
         if(!_.isObject(field.batchConfig)) field.batchConfig = {};
@@ -888,7 +888,6 @@ function cnBatchForms(
         };
 
         config.key = field.key;
-
         this.addToSchema(replaceKey, { type: 'string' });
         this.addToSchema(withKey, { type: 'string' });
 
