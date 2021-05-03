@@ -9366,7 +9366,6 @@ var fieldTypeHandlers = {
   'string': 'processDefault',
   'number': 'processNumber',
   'url': 'processDefault',
-  // 'fieldset': 'processFieldset',
   'array': 'processSelect',
   'cn-autocomplete': 'processSelect',
   'cn-currency': 'processNumber',
@@ -9444,8 +9443,6 @@ function processFormDiff(service, updates) {
 
 function setValue(ffService) {
   return function (val, update, original, mode, model) {
-    console.log('setValue', val, update, original, mode, model);
-    console.log('original.get()', original.get());
     if (mode === 'replace') {
       update.set(val);
     } else if (mode === 'append') {
@@ -9485,7 +9482,6 @@ function setValue(ffService) {
                       break;
                     }
                     if (!found) {
-                      console.log('NEW VAL: arrayVal');
                       newVal[key].push(arrayVal);
                     }
                   }
@@ -9522,7 +9518,6 @@ function setValue(ffService) {
             newVal[key] = val[key];
           }
         }
-        console.log('New Value', newVal);
         update.set(newVal);
       } else {
         update.set(val);
@@ -9639,7 +9634,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       processNumber: processNumber,
       processSelect: processSelect,
       processToggle: processToggle,
-      // processFieldset,
       registerFieldWatch: registerFieldWatch,
       resetDefaults: resetDefaults,
       restoreDefaults: restoreDefaults,
@@ -9691,7 +9685,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
   function onFieldScope(event, scope) {
     var key = cnFlexFormService.getKey(scope.form.key);
-    // console.log('onFieldScope', event, scope)
     if (key && !key.startsWith('__')) {
       if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
       var register = this.fieldRegister[key];
@@ -9709,12 +9702,8 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
   function processItems(fields) {
     var i = fields.length - 1;
-    // console.log('------')
-    // console.log('processItems', fields)
     while (i > -1) {
-      // console.log('item', fields[i])
       var child = this.processField(fields[i]);
-      // console.log('child', child)
       if (child && child.batchConfig) {
         if (child.type !== 'fieldset') {
           child.htmlClass = (child.htmlClass || '') + ' cn-batch-field clearfix';
@@ -9736,7 +9725,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           this.fieldRegister[child.key].wrapper = fields[i];
         }
       }
-      // console.log('child', child)
       if (!child) {
         // remove field if batch isn't supported by it or children
         fields.splice(i, 1);
@@ -9746,8 +9734,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   }
 
   function processField(field) {
-    // console.log('field key', field.key);
-    // console.log('field', field);
     if (field.key && field.type != 'fieldset') {
       if (!field.batchConfig) return false;
       field._key = field.key;
@@ -9761,7 +9747,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
       var fieldType = cnFlexFormTypes.getFieldType(field);
       var handler = fieldTypeHandlers[fieldType];
-      // console.log('Handler', handler)
       if (handler) {
         if (_.isString(handler)) handler = this[handler];
         if (!_.isObject(field.batchConfig)) field.batchConfig = {};
@@ -9779,7 +9764,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           }).map(function (x) {
             return _.assign(x, { parent: field.key, batchConfig: { default: field.batchConfig.default } });
           }).value();
-          // console.log('externalFields', externalFields)
           _.forEach(externalFields, processField.bind(this));
           _.forEach(externalFields, createBatchField.bind(this));
         }
@@ -9794,11 +9778,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           child.batchConfig = _.clone(field.batchConfig);
         });
       }
-      // console.log('processItems')
       this.processItems(field.items);
       if (!field.items.length) return false;
 
-      // console.log('items processed', field)
       if (field.batchConfig) {
         if (!_.isObject(field.batchConfig)) field.batchConfig = {};
         field.batchConfig.key = 'component_' + _.uniqueId();
@@ -9922,12 +9904,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     var _this3 = this;
 
     //let path = sfPath.parse(field.key);
-    // console.log('createDirtyCheck', field);
     if (!field.schema) {
-      // console.log('FindSchema', this);
       field.schema = cnFlexFormService.getSchema(field.realKey, this.schema.schema.properties);
     }
-    // console.trace()
     var key = '__dirtyCheck["' + (field.key || field.batchConfig.key) + '"]';
     //let child = path.length > 1;
     var htmlClass = '';
@@ -10226,7 +10205,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   function processSelect(field) {
     var _this8 = this;
 
-    // console.log('processSelect', field)
     var type = field.schema.type;
     var config = field.batchConfig;
 
@@ -10374,29 +10352,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       return _this9.resetDefaults(form);
     });
   }
-
-  // function processFieldset(fieldset) {
-  //   var service = this;
-
-  //   fieldset.type = 'cn-fieldset';
-  //   fieldset.items.forEach(service.processField.bind(service));
-
-  //   if(_.has(fieldset, 'pos') && fieldset.pos === 0) {
-  //     fieldset.htmlClass = (fieldset.htmlClass || '') + ' borderless';
-  //   }
-  //   if(fieldset.collapsible) {
-  //     fieldset.toggleCollapse = (fieldset) => {
-  //       if(fieldset.collapsible) {
-  //         fieldset.collapsed = !fieldset.collapsed;
-  //       }
-  //     };
-
-  //     fieldset.render = !fieldset.collapsed;
-  //   }
-  //   else {
-  //     fieldset.render = true;
-  //   }
-  // }
 
   function restoreDefaults(form) {
     var _this10 = this;
