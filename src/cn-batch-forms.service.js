@@ -97,6 +97,29 @@ export function setValue(ffService) {
           originalVal;
         update.set(updateVal);
       }
+      else if (_.isObject(originalVal) && _.isObject(val)) {
+        let newVal = _.cloneDeep(originalVal)
+        for (let key in val) {
+          if (key in originalVal && _.isArray(val[key]) && _.isArray(originalVal[key])) {
+            let found = false;
+            for (let arrayVal of val[key]) {
+              found = false;
+              for (let ogArrayVal of originalVal[key]) {
+                if (_.isEqual(ogArrayVal, arrayVal)) {
+                  found = true;
+                  break;
+                }
+                if (!found) {
+                  newVal[key].push(arrayVal);
+                }
+              }
+            }
+          } else {
+            newVal[key] = val[key];
+          }
+        }
+        update.set(newVal);
+      }
       else {
         update.set(val);
       }
@@ -291,7 +314,6 @@ function cnBatchForms(
 
   function onFieldScope(event, scope) {
     let key = cnFlexFormService.getKey(scope.form.key);
-
     if(key && !key.startsWith('__')) {
       if(!this.fieldRegister[key]) this.fieldRegister[key] = {};
       const register = this.fieldRegister[key];
@@ -341,10 +363,10 @@ function cnBatchForms(
     }
   }
 
-  function processField(field) {
-    if(field.key) {
-      if(!field.batchConfig) return false;
 
+  function processField(field) {
+    if(field.key && field.type != 'fieldset') {
+      if(!field.batchConfig) return false;
       field._key = field.key;
       field._placeholder = field.placeholder;
       field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
@@ -508,6 +530,9 @@ function cnBatchForms(
 
   function createDirtyCheck(field) {
     //let path = sfPath.parse(field.key);
+    if (!field.schema) {
+      field.schema = cnFlexFormService.getSchema(field.realKey, this.schema.schema.properties);
+    }
     let key = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
     //let child = path.length > 1;
     let htmlClass = '';
