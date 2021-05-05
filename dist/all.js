@@ -229,6 +229,9 @@ exports.processFormDiff = processFormDiff;
 exports.setValue = setValue;
 exports.processCondition = processCondition;
 exports.default = cnBatchFormsProvider;
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 // Needed for test bundle
 var _ = typeof window !== 'undefined' && window._ || __webpack_require__(4);
 
@@ -313,6 +316,7 @@ function processFormDiff(service, updates) {
 
 function setValue(ffService) {
   return function (val, update, original, mode, model) {
+    console.log('setValue', val, update, original, mode, model);
     if (mode === 'replace') {
       update.set(val);
     } else if (mode === 'append') {
@@ -326,68 +330,12 @@ function setValue(ffService) {
         var updateVal = val ? originalVal + ' ' + val.trim() : originalVal;
         update.set(updateVal);
       } else if (_.isObject(originalVal) && _.isObject(val)) {
-        var newVal = _.cloneDeep(originalVal);
-        for (var key in val) {
-          if (key in originalVal && _.isArray(val[key]) && _.isArray(originalVal[key])) {
-            var found = false;
-            var _iteratorNormalCompletion = true;
-            var _didIteratorError = false;
-            var _iteratorError = undefined;
+        console.log('originalValue', originalVal);
+        console.log('originalValue', val);
+        var newVal = _.merge(_.cloneDeep(originalVal), _.cloneDeep(val), function (a, b) {
+          return _.isArray(a) ? [].concat(_toConsumableArray(new Set(a.concat(b)))) : a;
+        });
 
-            try {
-              for (var _iterator = val[key][Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                var arrayVal = _step.value;
-
-                found = false;
-                var _iteratorNormalCompletion2 = true;
-                var _didIteratorError2 = false;
-                var _iteratorError2 = undefined;
-
-                try {
-                  for (var _iterator2 = originalVal[key][Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-                    var ogArrayVal = _step2.value;
-
-                    if (_.isEqual(ogArrayVal, arrayVal)) {
-                      found = true;
-                      break;
-                    }
-                    if (!found) {
-                      newVal[key].push(arrayVal);
-                    }
-                  }
-                } catch (err) {
-                  _didIteratorError2 = true;
-                  _iteratorError2 = err;
-                } finally {
-                  try {
-                    if (!_iteratorNormalCompletion2 && _iterator2.return) {
-                      _iterator2.return();
-                    }
-                  } finally {
-                    if (_didIteratorError2) {
-                      throw _iteratorError2;
-                    }
-                  }
-                }
-              }
-            } catch (err) {
-              _didIteratorError = true;
-              _iteratorError = err;
-            } finally {
-              try {
-                if (!_iteratorNormalCompletion && _iterator.return) {
-                  _iterator.return();
-                }
-              } finally {
-                if (_didIteratorError) {
-                  throw _iteratorError;
-                }
-              }
-            }
-          } else {
-            newVal[key] = val[key];
-          }
-        }
         update.set(newVal);
       } else {
         update.set(val);
@@ -411,10 +359,10 @@ function setValue(ffService) {
       update.set(_.subtract(original.get() || 0, val));
     } else if (mode === 'stringReplace' && original.get()) {
       var _originalVal2 = original.get();
-      var _key = original.path().key;
-      var replaceStr = ffService.parseExpression('__replace_' + _key, model).get();
+      var key = original.path().key;
+      var replaceStr = ffService.parseExpression('__replace_' + key, model).get();
       var replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
-      var withStr = ffService.parseExpression('__with_' + _key, model).get() || '';
+      var withStr = ffService.parseExpression('__with_' + key, model).get() || '';
       if (_.isArray(_originalVal2)) {
         var index = -1;
         if ((index = _.findIndex(_originalVal2, { name: replaceStr })) != -1) {
@@ -960,10 +908,10 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
           cnFlexFormService.parseExpression(assignable.fullPath, _this6.models[i]).set(val);
         } else {
+          // if (register.field.realKey) key = register.field.realKey;
           var _val = cnFlexFormService.parseExpression(key, _this6.model).get();
           var update = cnFlexFormService.parseExpression(key, models[i]);
           var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
-
           _this6.setValue(_val, update, original, mode, _this6.model);
         }
       });

@@ -98,26 +98,10 @@ export function setValue(ffService) {
         update.set(updateVal);
       }
       else if (_.isObject(originalVal) && _.isObject(val)) {
-        let newVal = _.cloneDeep(originalVal)
-        for (let key in val) {
-          if (key in originalVal && _.isArray(val[key]) && _.isArray(originalVal[key])) {
-            let found = false;
-            for (let arrayVal of val[key]) {
-              found = false;
-              for (let ogArrayVal of originalVal[key]) {
-                if (_.isEqual(ogArrayVal, arrayVal)) {
-                  found = true;
-                  break;
-                }
-                if (!found) {
-                  newVal[key].push(arrayVal);
-                }
-              }
-            }
-          } else {
-            newVal[key] = val[key];
-          }
-        }
+        let newVal = _.merge(_.cloneDeep(originalVal), _.cloneDeep(val), (a, b) =>
+           _.isArray(a) ? [...new Set(a.concat(b))] : a
+        );
+
         update.set(newVal);
       }
       else {
@@ -721,7 +705,6 @@ function cnBatchForms(
           let val = cnFlexFormService.parseExpression(key, this.model).get();
           let update = cnFlexFormService.parseExpression(key, models[i]);
           let original = cnFlexFormService.parseExpression(key, this.models[i]);
-
           this.setValue(val, update, original, mode, this.model);
         }
       });
