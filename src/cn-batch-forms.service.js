@@ -99,7 +99,7 @@ export function setValue(ffService) {
       }
       else if (_.isObject(originalVal) && _.isObject(val)) {
         let newVal = _.merge(_.cloneDeep(originalVal), _.cloneDeep(val), (a, b) =>
-           _.isArray(a) ? [...new Set(a.concat(b))] : a
+           _.isArray(a) ? _.uniq(a.concat(b)) : a
         );
 
         update.set(newVal);
