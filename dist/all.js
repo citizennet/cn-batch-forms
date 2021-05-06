@@ -229,6 +229,9 @@ exports.processFormDiff = processFormDiff;
 exports.setValue = setValue;
 exports.processCondition = processCondition;
 exports.default = cnBatchFormsProvider;
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 // Needed for test bundle
 var _ = typeof window !== 'undefined' && window._ || __webpack_require__(4);
 
@@ -313,6 +316,7 @@ function processFormDiff(service, updates) {
 
 function setValue(ffService) {
   return function (val, update, original, mode, model) {
+    console.log('setValue', val, update, original, mode, model);
     if (mode === 'replace') {
       update.set(val);
     } else if (mode === 'append') {
@@ -325,6 +329,14 @@ function setValue(ffService) {
       } else if (_.isString(originalVal)) {
         var updateVal = val ? originalVal + ' ' + val.trim() : originalVal;
         update.set(updateVal);
+      } else if (_.isObject(originalVal) && _.isObject(val)) {
+        console.log('originalValue', originalVal);
+        console.log('originalValue', val);
+        var newVal = _.merge(_.cloneDeep(originalVal), _.cloneDeep(val), function (a, b) {
+          return _.isArray(a) ? [].concat(_toConsumableArray(new Set(a.concat(b)))) : a;
+        });
+
+        update.set(newVal);
       } else {
         update.set(val);
       }
@@ -491,7 +503,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
   function onFieldScope(event, scope) {
     var key = cnFlexFormService.getKey(scope.form.key);
-
     if (key && !key.startsWith('__')) {
       if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
       var register = this.fieldRegister[key];
@@ -541,9 +552,8 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   }
 
   function processField(field) {
-    if (field.key) {
+    if (field.key && field.type != 'fieldset') {
       if (!field.batchConfig) return false;
-
       field._key = field.key;
       field._placeholder = field.placeholder;
       field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
@@ -712,6 +722,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     var _this3 = this;
 
     //let path = sfPath.parse(field.key);
+    if (!field.schema) {
+      field.schema = cnFlexFormService.getSchema(field.realKey, this.schema.schema.properties);
+    }
     var key = '__dirtyCheck["' + (field.key || field.batchConfig.key) + '"]';
     //let child = path.length > 1;
     var htmlClass = '';
@@ -895,10 +908,10 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
           cnFlexFormService.parseExpression(assignable.fullPath, _this6.models[i]).set(val);
         } else {
+          // if (register.field.realKey) key = register.field.realKey;
           var _val = cnFlexFormService.parseExpression(key, _this6.model).get();
           var update = cnFlexFormService.parseExpression(key, models[i]);
           var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
-
           _this6.setValue(_val, update, original, mode, _this6.model);
         }
       });

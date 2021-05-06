@@ -97,6 +97,13 @@ export function setValue(ffService) {
           originalVal;
         update.set(updateVal);
       }
+      else if (_.isObject(originalVal) && _.isObject(val)) {
+        let newVal = _.merge(_.cloneDeep(originalVal), _.cloneDeep(val), (a, b) =>
+           _.isArray(a) ? _.uniq(a.concat(b)) : a
+        );
+
+        update.set(newVal);
+      }
       else {
         update.set(val);
       }
@@ -291,7 +298,6 @@ function cnBatchForms(
 
   function onFieldScope(event, scope) {
     let key = cnFlexFormService.getKey(scope.form.key);
-
     if(key && !key.startsWith('__')) {
       if(!this.fieldRegister[key]) this.fieldRegister[key] = {};
       const register = this.fieldRegister[key];
@@ -341,10 +347,10 @@ function cnBatchForms(
     }
   }
 
-  function processField(field) {
-    if(field.key) {
-      if(!field.batchConfig) return false;
 
+  function processField(field) {
+    if(field.key && field.type != 'fieldset') {
+      if(!field.batchConfig) return false;
       field._key = field.key;
       field._placeholder = field.placeholder;
       field.schema = field.schema || cnFlexFormService.getSchema(field.key, this.schema.schema.properties);
@@ -508,6 +514,9 @@ function cnBatchForms(
 
   function createDirtyCheck(field) {
     //let path = sfPath.parse(field.key);
+    if (!field.schema) {
+      field.schema = cnFlexFormService.getSchema(field.realKey, this.schema.schema.properties);
+    }
     let key = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
     //let child = path.length > 1;
     let htmlClass = '';
@@ -696,7 +705,6 @@ function cnBatchForms(
           let val = cnFlexFormService.parseExpression(key, this.model).get();
           let update = cnFlexFormService.parseExpression(key, models[i]);
           let original = cnFlexFormService.parseExpression(key, this.models[i]);
-
           this.setValue(val, update, original, mode, this.model);
         }
       });
