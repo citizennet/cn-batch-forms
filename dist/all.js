@@ -229,9 +229,6 @@ exports.processFormDiff = processFormDiff;
 exports.setValue = setValue;
 exports.processCondition = processCondition;
 exports.default = cnBatchFormsProvider;
-
-function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
-
 // Needed for test bundle
 var _ = typeof window !== 'undefined' && window._ || __webpack_require__(4);
 
@@ -316,7 +313,6 @@ function processFormDiff(service, updates) {
 
 function setValue(ffService) {
   return function (val, update, original, mode, model) {
-    console.log('setValue', val, update, original, mode, model);
     if (mode === 'replace') {
       update.set(val);
     } else if (mode === 'append') {
@@ -330,10 +326,8 @@ function setValue(ffService) {
         var updateVal = val ? originalVal + ' ' + val.trim() : originalVal;
         update.set(updateVal);
       } else if (_.isObject(originalVal) && _.isObject(val)) {
-        console.log('originalValue', originalVal);
-        console.log('originalValue', val);
         var newVal = _.merge(_.cloneDeep(originalVal), _.cloneDeep(val), function (a, b) {
-          return _.isArray(a) ? [].concat(_toConsumableArray(new Set(a.concat(b)))) : a;
+          return _.isArray(a) ? _.uniq(a.concat(b)) : a;
         });
 
         update.set(newVal);
@@ -908,7 +902,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
           cnFlexFormService.parseExpression(assignable.fullPath, _this6.models[i]).set(val);
         } else {
-          // if (register.field.realKey) key = register.field.realKey;
           var _val = cnFlexFormService.parseExpression(key, _this6.model).get();
           var update = cnFlexFormService.parseExpression(key, models[i]);
           var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
