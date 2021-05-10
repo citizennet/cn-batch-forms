@@ -9726,8 +9726,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       if (field.batchConfig) {
         if (!_.isObject(field.batchConfig)) field.batchConfig = {};
         field.batchConfig.key = 'component_' + _.uniqueId();
-        field.batchConfig.watch = [];
-
+        field.batchConfig.watch = field.batchConfig.watch || [];
         field.items.forEach(function (item, i) {
           var child = item.items[0];
           if (!i) {
@@ -10003,6 +10002,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     var _this6 = this;
 
     var models = [];
+    var service = this;
 
     _.each(this.fieldRegister, function (register, key) {
       var configKey = register.field.parent ? register.field.parent : key;
@@ -10035,6 +10035,14 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           var _val = cnFlexFormService.parseExpression(key, _this6.model).get();
           var update = cnFlexFormService.parseExpression(key, models[i]);
           var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
+          var fields = service.getFormFromRegister(key);
+          if (fields.length > 0) {
+            var field = fields[0].field;
+            if (field.selectField) {
+              mode = cnFlexFormService.parseExpression('__batchConfig["' + field.selectDisplayKey + '"]', _this6.model).get();
+            }
+          }
+
           _this6.setValue(_val, update, original, mode, _this6.model);
         }
       });

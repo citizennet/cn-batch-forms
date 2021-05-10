@@ -399,8 +399,7 @@ function cnBatchForms(
       if(field.batchConfig) {
         if(!_.isObject(field.batchConfig)) field.batchConfig = {};
         field.batchConfig.key = `component_${_.uniqueId()}`;
-        field.batchConfig.watch = [];
-
+        field.batchConfig.watch = field.batchConfig.watch || [];
         field.items.forEach((item, i) => {
           let child = item.items[0];
           if(!i) {
@@ -662,6 +661,7 @@ function cnBatchForms(
 
   function getChangedModels() {
     let models = [];
+    let service = this;
 
     _.each(this.fieldRegister, (register, key) => {
       let configKey = register.field.parent ? register.field.parent : key;
@@ -705,6 +705,16 @@ function cnBatchForms(
           let val = cnFlexFormService.parseExpression(key, this.model).get();
           let update = cnFlexFormService.parseExpression(key, models[i]);
           let original = cnFlexFormService.parseExpression(key, this.models[i]);
+          let fields = service.getFormFromRegister(key);
+          if (fields.length > 0) {
+            let field = fields[0].field;
+            if (field.selectField) {
+              mode = cnFlexFormService
+                .parseExpression(`__batchConfig["${field.selectDisplayKey}"]`, this.model)
+                .get();
+            }
+          }
+
           this.setValue(val, update, original, mode, this.model);
         }
       });
