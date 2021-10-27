@@ -13,11 +13,13 @@ let fieldTypeHandlers = {
 };
 
 export function clearSchemaDefault(service, schema, key) {
-  // save for hydrating newly added array items
-  service.defaults[key] = schema.default;
 
-  // then remove because we don't want to override saved values with defaults
-  if ("default" in schema) schema.default = undefined;
+  if ("default" in schema) {
+    // save for hydrating newly added array items
+    service.defaults[key] = schema.default;
+    // then remove because we don't want to override saved values with defaults
+    delete schema.default;
+  }
 
   if(schema.type === 'object' && schema.properties) {
     if ("required" in schema) schema.required = undefined;
@@ -291,7 +293,7 @@ function cnBatchForms(
     $rootScope.$on('schemaFormPropagateScope', this.onFieldScope.bind(this));
     $rootScope.$on('cnFlexFormReprocessField', this.onReprocessField.bind(this));
 
-    console.info('BatchDone:', schema, model, models);
+    console.info('BatchDone:', 'Schema', schema, 'Model', model, 'Models', models, 'Defaults', this.defaults);
 
     return this;
   }
@@ -978,6 +980,8 @@ function cnBatchForms(
       if(item.key) {
         if(item.schema) {
           let key = cnFlexFormService.getKey(item.key).replace(/\[\d+]/g, '[]');
+          console.log("KEY");
+          console.log(key);
           item.schema.default = this.defaults[key];
         }
       }
@@ -998,7 +1002,7 @@ function cnBatchForms(
     if(!form.items) return;
     form.items.forEach(item => {
       if(item.schema) {
-        item.schema.default = undefined;
+        delete item.schema.default;
       }
       this.resetDefaults(item);
     });
