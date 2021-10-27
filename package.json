@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/citizennet/cn-batch-forms.git"
+    "url": "git+https://github.com/citizennet/cn-batch-forms.git#API-1830-batch-edit-placements"
   },
   "author": "dzuch",
   "license": "ISC",
