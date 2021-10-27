@@ -546,7 +546,7 @@ function cnBatchForms(
 
     dirtyCheck.fieldWatch = {
       resolution: (val) => {
-          const register = this.fieldRegister[field._key];
+          const register = this.fieldRegister[field._key] || this.fieldRegister[field.realKey];
           if(register) {
             if(_.get(register, 'ngModel.$dirty')) {
               cnFlexFormService.parseExpression(key, this.model).set(true);
