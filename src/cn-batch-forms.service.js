@@ -16,20 +16,29 @@ export function clearSchemaDefault(service, schema, key) {
   // save for hydrating newly added array items
   service.defaults[key] = schema.default;
 
-  // then remove because we don't want to override saved values with defaults
-  if ("default" in schema) schema.default = undefined;
+  if (!key || (key && !key.startsWith("__batchConfig"))){
+    // then remove because we don't want to override saved values with defaults
+    if ("default" in schema) schema.default = undefined;
 
-  if(schema.type === 'object' && schema.properties) {
-    if ("required" in schema) schema.required = undefined;
-    // _.each(schema.properties, service.clearSchemaDefault.bind(this));
-    for(let k in schema.properties) {
-      clearSchemaDefault(service, schema.properties[k], `${key}.${k}`);
+    if(schema.type === 'object' && schema.properties) {
+      if ("required" in schema) schema.required = undefined;
+      // _.each(schema.properties, service.clearSchemaDefault.bind(this));
+      for(let k in schema.properties) {
+        clearSchemaDefault(service, schema.properties[k], `${key}.${k}`);
+      }
+    }
+    else if(schema.type === 'array' && schema.items) {
+      clearSchemaDefault(service, schema.items, `${key}[]`);
     }
   }
-  else if(schema.type === 'array' && schema.items) {
-    clearSchemaDefault(service, schema.items, `${key}[]`);
-  }
 }
+
+export function createConfigKey(key) {
+  if (_.isString(key)) return key.replaceAll('.', '-');
+  else if (_.isArray(key)) return key.join('-');
+  return key;
+}
+
 
 export function processDiff(service) {
   const { schema } = service;
@@ -164,16 +173,17 @@ export function setValue(ffService) {
 
 export function processCondition(condition) {
   if(!condition) return condition;
-  const fnMatch = condition.match(/(model)\.(\S*)\.([^.]+\([^)]*\))(.*)$/)
-  return fnMatch ?
-    `(${fnMatch[1]}.${fnMatch[2]} === undefined ?
-      ${fnMatch[1]}.__ogValues["${fnMatch[2]}"].${fnMatch[3]} :
-      ${fnMatch[1]}.${fnMatch[2]}.${fnMatch[3]})
-      ${fnMatch[4]}`.trim().replace(/\s+/g, ' ') :
-    condition.replace(
-      /\b(model)\.(\S*)\b/g,
-      '($1.$2 === undefined ? $1.__ogValues["$2"] : $1.$2)'
+  let modelPhrases = condition.match(/model(\.[a-zA-Z0-9_-]+)+\(?/g) || [];
+  _.uniq(modelPhrases).forEach(phrase => {
+    if (phrase.endsWith('(')) {
+      phrase = phrase.slice(0, phrase.lastIndexOf('.'));
+    }
+    let key = phrase.slice(6);
+    condition = condition.replaceAll(
+      phrase, `(${phrase} === undefined ? model.__ogValues.${createConfigKey(key)} : ${phrase})`
     );
+  });
+  return condition;
 }
 
 export default function cnBatchFormsProvider() {
@@ -213,7 +223,7 @@ function cnBatchForms(
   function augmentSchema(schema, model, models) {
     if(!models.length) return schema;
 
-    var service = BatchForms(schema, model, models);
+    let service = BatchForms(schema, model, models);
 
     return service;
   }
@@ -299,12 +309,12 @@ function cnBatchForms(
   function onFieldScope(event, scope) {
     let key = cnFlexFormService.getKey(scope.form.key);
     if(key && !key.startsWith('__')) {
-      if(!this.fieldRegister[key]) this.fieldRegister[key] = {};
+      if(!this.fieldRegister[key]) {this.fieldRegister[key] = {};}
       const register = this.fieldRegister[key];
       register.ngModel = scope.ngModel;
       register.scope = scope;
 
-      if(!this.fieldRegister[key].field) this.fieldRegister[key].field = scope.form;
+      if(!this.fieldRegister[key].field) {this.fieldRegister[key].field = scope.form;}
     }
 
     // prevent edit mode radiobuttons from setting form to dirty
@@ -368,7 +378,7 @@ function cnBatchForms(
         field.batchConfig.ogValues = this.getModelValues(field);
 
         if(_.allEqual(field.batchConfig.ogValues)) {
-          let key = `__ogValues["${field.key}"]`;
+          let key = `__ogValues.${createConfigKey(field.key)}`;
           let first = _.first(field.batchConfig.ogValues);
           cnFlexFormService.parseExpression(key, this.model).set(first);
         }
@@ -394,10 +404,10 @@ function cnBatchForms(
         });
       }
       this.processItems(field.items);
-      if(!field.items.length) return false;
+      if(!field.items.length) {return false;}
 
       if(field.batchConfig) {
-        if(!_.isObject(field.batchConfig)) field.batchConfig = {};
+        if(!_.isObject(field.batchConfig)) {field.batchConfig = {};}
         field.batchConfig.key = `component_${_.uniqueId()}`;
         field.batchConfig.watch = field.batchConfig.watch || [];
         field.items.forEach((item, i) => {
@@ -407,7 +417,7 @@ function cnBatchForms(
             field.batchConfig.default = child.batchConfig.default;
           }
           field.batchConfig.watch.push({
-            resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
+            resolution: `model.__batchConfig.${createConfigKey(child.key)} = model.__batchConfig.${createConfigKey(field.batchConfig.key)}`
           });
           //item.items[2].condition = 'false';
           if(item.items.lenth > 2) {
@@ -437,7 +447,7 @@ function cnBatchForms(
 
   function createBatchField(field) {
     let batchConfig = field.batchConfig;
-    let key = `__batchConfig["${field.key || batchConfig.key}"]`;
+    let key = `__batchConfig.${createConfigKey(field.key || batchConfig.key)}`;
 
     let batchField = {
       key,
@@ -516,7 +526,7 @@ function cnBatchForms(
     if (!field.schema) {
       field.schema = cnFlexFormService.getSchema(field.realKey, this.schema.schema.properties);
     }
-    let key = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
+    let key = `__dirtyCheck.${createConfigKey(field.key || field.batchConfig.key)}`;
     //let child = path.length > 1;
     let htmlClass = '';
 
@@ -586,7 +596,7 @@ function cnBatchForms(
           const register = this.fieldRegister[key];
           if(!_.get(register, 'ngModel.$dirty')) return;
         }
-        cnFlexFormService.parseExpression(`__dirtyCheck["${key}"]`, this.model).set(val);
+        cnFlexFormService.parseExpression(`__dirtyCheck.${createConfigKey(key)}`, this.model).set(val);
       });
     };
   }
@@ -664,15 +674,15 @@ function cnBatchForms(
     let service = this;
 
     _.each(this.fieldRegister, (register, key) => {
-      let configKey = register.field.parent ? register.field.parent : key;
+      let configKeyBase = createConfigKey(register.field.parent ? register.field.parent : key);
       let dirty = cnFlexFormService
-          .parseExpression(`__dirtyCheck["${configKey}"]`, this.model)
+          .parseExpression(`__dirtyCheck.${configKeyBase}`, this.model)
           .get();
 
       if(!dirty) return;
 
       let mode = cnFlexFormService
-          .parseExpression(`__batchConfig["${configKey}"]`, this.model)
+          .parseExpression(`__batchConfig.${configKeyBase}`, this.model)
           .get();
 
       this.models.forEach((model, i) => {
@@ -710,7 +720,7 @@ function cnBatchForms(
             let field = fields[0].field;
             if (field.selectField) {
               mode = cnFlexFormService
-                .parseExpression(`__batchConfig["${field.selectDisplayKey}"]`, this.model)
+                .parseExpression(`__batchConfig.${createConfigKey(field.selectDisplayKey)}`, this.model)
                 .get();
             }
           }
@@ -763,9 +773,10 @@ function cnBatchForms(
 
     if(config.editModes.includes('stringReplace')) {
       const dirtyCheck = this.createDirtyCheck(field);
-      let configKey = `__batchConfig["${field.key || field.batchConfig.key}"]`;
-      let replaceKey = `__replace_${field.key || field.batchConfig.key}`;
-      let withKey = `__with_${field.key || field.batchConfig.key}`;
+      let configKeyBase = createConfigKey(field.key || field.batchConfig.key);
+      let configKey = `__batchConfig.${configKeyBase}`;
+      let replaceKey = `__replace_${configKeyBase}`;
+      let withKey = `__with_${configKeyBase}`;
       let stringReplaceField = {
         type: 'component',
         items: [
@@ -817,10 +828,7 @@ function cnBatchForms(
   }
 
   function setNestedPlaceholder(field) {
-    if(field.items) {
-      //field.items.forEach(setNestedPlaceholder);
-    }
-    else {
+    if(!field.items) {
       setPlaceholder(field, '—');
     }
   }
@@ -864,9 +872,10 @@ function cnBatchForms(
 
       if(config.editModes.includes('stringReplace')) {
         const dirtyCheck = this.createDirtyCheck(field);
-        let configKey = `__batchConfig["${field.key || field.batchConfig.key}"]`;
-        let replaceKey = `__replace_${field.key || field.batchConfig.key}`;
-        let withKey = `__with_${field.key || field.batchConfig.key}`;
+        let configKeyBase = createConfigKey(field.key || field.batchConfig.key);
+        let configKey = `__batchConfig.${configKeyBase}`;
+        let replaceKey = `__replace_${configKeyBase}`;
+        let withKey = `__with_${configKeyBase}`;
         let replaceTitleMap = field.batchConfig.replaceTitleMap;
 
         let replaceItem = {};
@@ -997,10 +1006,12 @@ function cnBatchForms(
   function resetDefaults(form) {
     if(!form.items) return;
     form.items.forEach(item => {
-      if(item.schema) {
-        item.schema.default = undefined;
+      if (!item.key || (item.key && !item.key.includes("__batchConfig"))) {
+        if(item.schema) {
+          item.schema.default = undefined;
+        }
+        this.resetDefaults(item);
       }
-      this.resetDefaults(item);
     });
   }
 
