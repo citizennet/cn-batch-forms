@@ -1,6 +1,6 @@
 {
   "name": "cn-batch-forms",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "description": "Angular service for handling batch form updates, to be used with *cn-flex-form*",
   "main": "index.js",
   "watch": {
