@@ -223,7 +223,6 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.clearSchemaDefault = clearSchemaDefault;
-exports.createConfigKey = createConfigKey;
 exports.processDiff = processDiff;
 exports.processSchemaDiff = processSchemaDiff;
 exports.processFormDiff = processFormDiff;
@@ -242,13 +241,13 @@ var fieldTypeHandlers = {
   'cn-currency': 'processNumber',
   'cn-datetimepicker': 'processDate',
   'cn-toggle': 'processToggle'
-};
+}; // TODO processSelectDispayArray esp set up __dirtyCheck
 
 function clearSchemaDefault(service, schema, key) {
   // save for hydrating newly added array items
   service.defaults[key] = schema.default;
 
-  if (!key || key && !key.startsWith("__batchConfig")) {
+  if (!key || key && !key.includes("__batchConfig")) {
     // then remove because we don't want to override saved values with defaults
     if ("default" in schema) schema.default = undefined;
 
@@ -262,11 +261,6 @@ function clearSchemaDefault(service, schema, key) {
       clearSchemaDefault(service, schema.items, key + '[]');
     }
   }
-}
-
-function createConfigKey(key) {
-  if (_.isString(key)) return key.replaceAll('.', '-');else if (_.isArray(key)) return key.join('-');
-  return key;
 }
 
 function processDiff(service) {
@@ -393,7 +387,7 @@ function processCondition(condition) {
       phrase = phrase.slice(0, phrase.lastIndexOf('.'));
     }
     var key = phrase.slice(6);
-    condition = condition.replaceAll(phrase, '(' + phrase + ' === undefined ? model.__ogValues.' + createConfigKey(key) + ' : ' + phrase + ')');
+    condition = condition.replaceAll(phrase, '(' + phrase + ' === undefined ? model.__ogValues["' + key + '"] : ' + phrase + ')');
   });
   return condition;
 }
@@ -513,20 +507,16 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   function onFieldScope(event, scope) {
     var key = cnFlexFormService.getKey(scope.form.key);
     if (key && !key.startsWith('__')) {
-      if (!this.fieldRegister[key]) {
-        this.fieldRegister[key] = {};
-      }
+      if (!this.fieldRegister[key]) this.fieldRegister[key] = {};
       var register = this.fieldRegister[key];
       register.ngModel = scope.ngModel;
       register.scope = scope;
 
-      if (!this.fieldRegister[key].field) {
-        this.fieldRegister[key].field = scope.form;
-      }
+      if (!this.fieldRegister[key].field) this.fieldRegister[key].field = scope.form;
     }
 
     // prevent edit mode radiobuttons from setting form to dirty
-    else if (key && scope.form.key[0] === '__batchConfig') {
+    else if (key && scope.form.key.includes('__batchConfig')) {
         scope.ngModel.$pristine = false;
       }
   }
@@ -584,7 +574,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
         field.batchConfig.ogValues = this.getModelValues(field);
 
         if (_.allEqual(field.batchConfig.ogValues)) {
-          var key = '__ogValues.' + createConfigKey(field.key);
+          var key = '__ogValues["' + field.key + '"]';
           var first = _.first(field.batchConfig.ogValues);
           cnFlexFormService.parseExpression(key, this.model).set(first);
         }
@@ -610,14 +600,10 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
         });
       }
       this.processItems(field.items);
-      if (!field.items.length) {
-        return false;
-      }
+      if (!field.items.length) return false;
 
       if (field.batchConfig) {
-        if (!_.isObject(field.batchConfig)) {
-          field.batchConfig = {};
-        }
+        if (!_.isObject(field.batchConfig)) field.batchConfig = {};
         field.batchConfig.key = 'component_' + _.uniqueId();
         field.batchConfig.watch = field.batchConfig.watch || [];
         field.items.forEach(function (item, i) {
@@ -627,7 +613,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
             field.batchConfig.default = child.batchConfig.default;
           }
           field.batchConfig.watch.push({
-            resolution: 'model.__batchConfig.' + createConfigKey(child.key) + ' = model.__batchConfig.' + createConfigKey(field.batchConfig.key)
+            resolution: 'model.__batchConfig["' + child.key + '"] = model.__batchConfig["' + field.batchConfig.key + '"]'
           });
           //item.items[2].condition = 'false';
           if (item.items.lenth > 2) {
@@ -659,7 +645,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
   function createBatchField(field) {
     var batchConfig = field.batchConfig;
-    var key = '__batchConfig.' + createConfigKey(field.key || batchConfig.key);
+    var key = '__batchConfig["' + (field.key || batchConfig.parent) + '"]';
 
     var batchField = {
       key: key,
@@ -739,9 +725,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
     //let path = sfPath.parse(field.key);
     if (!field.schema) {
-      field.schema = cnFlexFormService.getSchema(field.realKey, this.schema.schema.properties);
+      field.schema = cnFlexFormService.getSchema(field.realKey || field.link, this.schema.schema.properties);
     }
-    var key = '__dirtyCheck.' + createConfigKey(field.key || field.batchConfig.key);
+    var key = '__dirtyCheck["' + (field.key || field.batchConfig.key) + '"]';
     //let child = path.length > 1;
     var htmlClass = '';
 
@@ -769,7 +755,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
     dirtyCheck.fieldWatch = {
       resolution: function resolution(val) {
-        var register = _this3.fieldRegister[field._key];
+        var register = _this3.fieldRegister[field._key || field.realKey || field.link];
         if (register) {
           if (_.get(register, 'ngModel.$dirty')) {
             cnFlexFormService.parseExpression(key, _this3.model).set(true);
@@ -812,7 +798,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           var register = _this4.fieldRegister[key];
           if (!_.get(register, 'ngModel.$dirty')) return;
         }
-        cnFlexFormService.parseExpression('__dirtyCheck.' + createConfigKey(key), _this4.model).set(val);
+        cnFlexFormService.parseExpression('__dirtyCheck["' + key + '"]', _this4.model).set(val);
       });
     };
   }
@@ -894,16 +880,17 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   function getChangedModels() {
     var _this6 = this;
 
+    // TODO
     var models = [];
     var service = this;
 
     _.each(this.fieldRegister, function (register, key) {
-      var configKeyBase = createConfigKey(register.field.parent ? register.field.parent : key);
-      var dirty = cnFlexFormService.parseExpression('__dirtyCheck.' + configKeyBase, _this6.model).get();
+      var configKeyBase = register.field.parent || key;
+      var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + configKeyBase + '"]', _this6.model).get();
 
       if (!dirty) return;
 
-      var mode = cnFlexFormService.parseExpression('__batchConfig.' + configKeyBase, _this6.model).get();
+      var mode = cnFlexFormService.parseExpression('__batchConfig["' + configKeyBase + '"]', _this6.model).get();
 
       _this6.models.forEach(function (model, i) {
         models[i] = models[i] || {};
@@ -932,7 +919,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           if (fields.length > 0) {
             var field = fields[0].field;
             if (field.selectField) {
-              mode = cnFlexFormService.parseExpression('__batchConfig.' + createConfigKey(field.selectDisplayKey), _this6.model).get();
+              mode = cnFlexFormService.parseExpression('__batchConfig["' + field.selectDisplayKey + '"]', _this6.model).get();
             }
           }
 
@@ -985,8 +972,8 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
     if (config.editModes.includes('stringReplace')) {
       var dirtyCheck = this.createDirtyCheck(field);
-      var configKeyBase = createConfigKey(field.key || field.batchConfig.key);
-      var configKey = '__batchConfig.' + configKeyBase;
+      var configKeyBase = field.key || field.batchConfig.key;
+      var configKey = '__batchConfig["' + configKeyBase + '"]';
       var replaceKey = '__replace_' + configKeyBase;
       var withKey = '__with_' + configKeyBase;
       var stringReplaceField = {
@@ -1083,8 +1070,8 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
       if (config.editModes.includes('stringReplace')) {
         var dirtyCheck = this.createDirtyCheck(field);
-        var configKeyBase = createConfigKey(field.key || field.batchConfig.key);
-        var configKey = '__batchConfig.' + configKeyBase;
+        var configKeyBase = field.key || field.batchConfig.key;
+        var configKey = '__batchConfig["' + configKeyBase + '"]';
         var replaceKey = '__replace_' + configKeyBase;
         var withKey = '__with_' + configKeyBase;
         var replaceTitleMap = field.batchConfig.replaceTitleMap;
@@ -1279,6 +1266,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     }
     if (this.editModes.increase) {
       legends += '\n          <dl>\n            <dt>Increase:</dt>\n            <dd>Add the given value to the original\n            values for each item.</dd>\n          </dl>';
+    }
+    if (this.editModes.stringReplace) {
+      legends += '\n          <dl>\n            <dt>StringReplace:</dt>\n            <dd>Find instances of one string and replace\n            it with another.</dd>\n          </dl>';
     }
 
     return legends;

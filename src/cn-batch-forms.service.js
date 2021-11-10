@@ -16,7 +16,7 @@ export function clearSchemaDefault(service, schema, key) {
   // save for hydrating newly added array items
   service.defaults[key] = schema.default;
 
-  if (!key || (key && !key.startsWith("__batchConfig"))){
+  if (!key || (key && !key.includes("__batchConfig"))){
     // then remove because we don't want to override saved values with defaults
     if ("default" in schema) schema.default = undefined;
 
@@ -32,13 +32,6 @@ export function clearSchemaDefault(service, schema, key) {
     }
   }
 }
-
-export function createConfigKey(key) {
-  if (_.isString(key)) return key.replaceAll('.', '-');
-  else if (_.isArray(key)) return key.join('-');
-  return key;
-}
-
 
 export function processDiff(service) {
   const { schema } = service;
@@ -180,7 +173,7 @@ export function processCondition(condition) {
     }
     let key = phrase.slice(6);
     condition = condition.replaceAll(
-      phrase, `(${phrase} === undefined ? model.__ogValues.${createConfigKey(key)} : ${phrase})`
+      phrase, `(${phrase} === undefined ? model.__ogValues["${key}"] : ${phrase})`
     );
   });
   return condition;
@@ -223,7 +216,7 @@ function cnBatchForms(
   function augmentSchema(schema, model, models) {
     if(!models.length) return schema;
 
-    let service = BatchForms(schema, model, models);
+    var service = BatchForms(schema, model, models);
 
     return service;
   }
@@ -309,20 +302,19 @@ function cnBatchForms(
   function onFieldScope(event, scope) {
     let key = cnFlexFormService.getKey(scope.form.key);
     if(key && !key.startsWith('__')) {
-      if(!this.fieldRegister[key]) {this.fieldRegister[key] = {};}
+      if(!this.fieldRegister[key]) this.fieldRegister[key] = {};
       const register = this.fieldRegister[key];
       register.ngModel = scope.ngModel;
       register.scope = scope;
 
-      if(!this.fieldRegister[key].field) {this.fieldRegister[key].field = scope.form;}
+      if(!this.fieldRegister[key].field) this.fieldRegister[key].field = scope.form;
     }
 
     // prevent edit mode radiobuttons from setting form to dirty
-    else if(key && scope.form.key[0] === '__batchConfig') {
+    else if(key && scope.form.key.includes('__batchConfig')) {
       scope.ngModel.$pristine = false;
     }
   }
-
 
   function processItems(fields) {
     let i = fields.length - 1;
@@ -357,7 +349,6 @@ function cnBatchForms(
     }
   }
 
-
   function processField(field) {
     if(field.key && field.type != 'fieldset') {
       if(!field.batchConfig) return false;
@@ -378,7 +369,7 @@ function cnBatchForms(
         field.batchConfig.ogValues = this.getModelValues(field);
 
         if(_.allEqual(field.batchConfig.ogValues)) {
-          let key = `__ogValues.${createConfigKey(field.key)}`;
+          let key = `__ogValues["${field.key}"]`;
           let first = _.first(field.batchConfig.ogValues);
           cnFlexFormService.parseExpression(key, this.model).set(first);
         }
@@ -404,10 +395,10 @@ function cnBatchForms(
         });
       }
       this.processItems(field.items);
-      if(!field.items.length) {return false;}
+      if(!field.items.length) return false;
 
       if(field.batchConfig) {
-        if(!_.isObject(field.batchConfig)) {field.batchConfig = {};}
+        if(!_.isObject(field.batchConfig)) field.batchConfig = {};
         field.batchConfig.key = `component_${_.uniqueId()}`;
         field.batchConfig.watch = field.batchConfig.watch || [];
         field.items.forEach((item, i) => {
@@ -417,7 +408,7 @@ function cnBatchForms(
             field.batchConfig.default = child.batchConfig.default;
           }
           field.batchConfig.watch.push({
-            resolution: `model.__batchConfig.${createConfigKey(child.key)} = model.__batchConfig.${createConfigKey(field.batchConfig.key)}`
+            resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
           });
           //item.items[2].condition = 'false';
           if(item.items.lenth > 2) {
@@ -447,7 +438,7 @@ function cnBatchForms(
 
   function createBatchField(field) {
     let batchConfig = field.batchConfig;
-    let key = `__batchConfig.${createConfigKey(field.key || batchConfig.key)}`;
+    let key = `__batchConfig["${field.key || batchConfig.parent}"]`;
 
     let batchField = {
       key,
@@ -524,9 +515,9 @@ function cnBatchForms(
   function createDirtyCheck(field) {
     //let path = sfPath.parse(field.key);
     if (!field.schema) {
-      field.schema = cnFlexFormService.getSchema(field.realKey, this.schema.schema.properties);
+      field.schema = cnFlexFormService.getSchema(field.realKey || field.link, this.schema.schema.properties);
     }
-    let key = `__dirtyCheck.${createConfigKey(field.key || field.batchConfig.key)}`;
+    let key = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
     //let child = path.length > 1;
     let htmlClass = '';
 
@@ -554,7 +545,7 @@ function cnBatchForms(
 
     dirtyCheck.fieldWatch = {
       resolution: (val) => {
-          const register = this.fieldRegister[field._key];
+          const register = this.fieldRegister[field._key || field.realKey || field.link];
           if(register) {
             if(_.get(register, 'ngModel.$dirty')) {
               cnFlexFormService.parseExpression(key, this.model).set(true);
@@ -596,7 +587,7 @@ function cnBatchForms(
           const register = this.fieldRegister[key];
           if(!_.get(register, 'ngModel.$dirty')) return;
         }
-        cnFlexFormService.parseExpression(`__dirtyCheck.${createConfigKey(key)}`, this.model).set(val);
+        cnFlexFormService.parseExpression(`__dirtyCheck["${key}"]`, this.model).set(val);
       });
     };
   }
@@ -674,15 +665,15 @@ function cnBatchForms(
     let service = this;
 
     _.each(this.fieldRegister, (register, key) => {
-      let configKeyBase = createConfigKey(register.field.parent ? register.field.parent : key);
+      let configKeyBase = register.field.parent || key;
       let dirty = cnFlexFormService
-          .parseExpression(`__dirtyCheck.${configKeyBase}`, this.model)
+          .parseExpression(`__dirtyCheck["${configKeyBase}"]`, this.model)
           .get();
 
       if(!dirty) return;
 
       let mode = cnFlexFormService
-          .parseExpression(`__batchConfig.${configKeyBase}`, this.model)
+          .parseExpression(`__batchConfig["${configKeyBase}"]`, this.model)
           .get();
 
       this.models.forEach((model, i) => {
@@ -720,7 +711,7 @@ function cnBatchForms(
             let field = fields[0].field;
             if (field.selectField) {
               mode = cnFlexFormService
-                .parseExpression(`__batchConfig.${createConfigKey(field.selectDisplayKey)}`, this.model)
+                .parseExpression(`__batchConfig["${field.selectDisplayKey}"]`, this.model)
                 .get();
             }
           }
@@ -773,8 +764,8 @@ function cnBatchForms(
 
     if(config.editModes.includes('stringReplace')) {
       const dirtyCheck = this.createDirtyCheck(field);
-      let configKeyBase = createConfigKey(field.key || field.batchConfig.key);
-      let configKey = `__batchConfig.${configKeyBase}`;
+      let configKeyBase = field.key || field.batchConfig.key;
+      let configKey = `__batchConfig["${configKeyBase}"]`;
       let replaceKey = `__replace_${configKeyBase}`;
       let withKey = `__with_${configKeyBase}`;
       let stringReplaceField = {
@@ -872,8 +863,8 @@ function cnBatchForms(
 
       if(config.editModes.includes('stringReplace')) {
         const dirtyCheck = this.createDirtyCheck(field);
-        let configKeyBase = createConfigKey(field.key || field.batchConfig.key);
-        let configKey = `__batchConfig.${configKeyBase}`;
+        let configKeyBase = field.key || field.batchConfig.key;
+        let configKey = `__batchConfig["${configKeyBase}"]`;
         let replaceKey = `__replace_${configKeyBase}`;
         let withKey = `__with_${configKeyBase}`;
         let replaceTitleMap = field.batchConfig.replaceTitleMap;
@@ -1089,6 +1080,14 @@ function cnBatchForms(
             <dt>Increase:</dt>
             <dd>Add the given value to the original
             values for each item.</dd>
+          </dl>`;
+    }
+    if(this.editModes.stringReplace) {
+      legends += `
+          <dl>
+            <dt>StringReplace:</dt>
+            <dd>Find instances of one string and replace
+            it with another.</dd>
           </dl>`;
     }
 
