@@ -10784,7 +10784,7 @@ var fieldTypeHandlers = {
   'cn-currency': 'processNumber',
   'cn-datetimepicker': 'processDate',
   'cn-toggle': 'processToggle'
-}; // TODO processSelectDispayArray esp set up __dirtyCheck
+};
 
 function clearSchemaDefault(service, schema, key) {
   // save for hydrating newly added array items
@@ -11188,7 +11188,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
   function createBatchField(field) {
     var batchConfig = field.batchConfig;
-    var key = '__batchConfig["' + (field.key || batchConfig.parent) + '"]';
+    var key = '__batchConfig["' + (field.key || batchConfig.key) + '"]';
 
     var batchField = {
       key: key,
@@ -11423,7 +11423,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   function getChangedModels() {
     var _this6 = this;
 
-    // TODO
     var models = [];
     var service = this;
 

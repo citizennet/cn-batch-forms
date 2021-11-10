@@ -438,7 +438,7 @@ function cnBatchForms(
 
   function createBatchField(field) {
     let batchConfig = field.batchConfig;
-    let key = `__batchConfig["${field.key || batchConfig.parent}"]`;
+    let key = `__batchConfig["${field.key || batchConfig.key}"]`;
 
     let batchField = {
       key,
