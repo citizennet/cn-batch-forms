@@ -486,8 +486,8 @@ test('processCondition', t => {
     t.equal(
       processCondition("model.admin.positions.includes('stream')"),
       "(model.admin.positions === undefined ? "
-      + "model.__ogValues[\"admin.positions\"].includes('stream') : "
-      + "model.admin.positions.includes('stream'))"
+      + "model.__ogValues[\"admin.positions\"] : "
+      + "model.admin.positions).includes('stream')"
     )
     t.end()
   })
@@ -496,8 +496,8 @@ test('processCondition', t => {
     t.equal(
       processCondition("model.admin.positions.indexOf('stream') > -1"),
       "(model.admin.positions === undefined ? "
-      + "model.__ogValues[\"admin.positions\"].indexOf('stream') : "
-      + "model.admin.positions.indexOf('stream')) > -1"
+      + "model.__ogValues[\"admin.positions\"] : "
+      + "model.admin.positions).indexOf('stream') > -1"
     )
     t.end()
   })
