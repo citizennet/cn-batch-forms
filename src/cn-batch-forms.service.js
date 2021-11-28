@@ -339,6 +339,12 @@ function cnBatchForms(
           this.fieldRegister[child.key].field = child;
           this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
           this.fieldRegister[child.key].wrapper = fields[i];
+          if (child.link) {
+            this.fieldRegister[child.link] = {};
+            this.fieldRegister[child.link].dirtyCheck = dirtyCheck;
+            this.fieldRegister[child.link].field = child;
+            this.fieldRegister[child.link].wrapper = fields[i];
+          }
         }
       }
       if(!child) {
@@ -513,15 +519,9 @@ function cnBatchForms(
   }
 
   function createDirtyCheck(field) {
-    //let path = sfPath.parse(field.key);
-    if (!field.schema) {
-      field.schema = cnFlexFormService.getSchema(field.realKey || field.link, this.schema.schema.properties);
-    }
     let key = `__dirtyCheck["${field.key || field.batchConfig.key}"]`;
-    //let child = path.length > 1;
     let htmlClass = '';
 
-    //if(child) htmlClass += ' semi-transparent';
     if(field.notitle || !field.schema.title) htmlClass += ' notitle';
 
     let dirtyCheck = {
@@ -530,10 +530,8 @@ function cnBatchForms(
       type: 'cn-dirty-check',
       watch: [{
         resolution: (val) => {
-          //$timeout(() => {
             this.setValidation(field, val);
             $rootScope.$broadcast('schemaFormValidate');
-          //});
         }
       }]
     };
@@ -545,7 +543,7 @@ function cnBatchForms(
 
     dirtyCheck.fieldWatch = {
       resolution: (val) => {
-          const register = this.fieldRegister[field._key || field.realKey || field.link];
+          const register = this.fieldRegister[field._key || field.link];
           if(register) {
             if(_.get(register, 'ngModel.$dirty')) {
               cnFlexFormService.parseExpression(key, this.model).set(true);
@@ -665,7 +663,7 @@ function cnBatchForms(
     let service = this;
 
     _.each(this.fieldRegister, (register, key) => {
-      let configKeyBase = register.field.parent || key;
+      let configKeyBase = register.field.selectDisplay ? register.field._key : key;
       let dirty = cnFlexFormService
           .parseExpression(`__dirtyCheck["${configKeyBase}"]`, this.model)
           .get();
@@ -706,16 +704,6 @@ function cnBatchForms(
           let val = cnFlexFormService.parseExpression(key, this.model).get();
           let update = cnFlexFormService.parseExpression(key, models[i]);
           let original = cnFlexFormService.parseExpression(key, this.models[i]);
-          let fields = service.getFormFromRegister(key);
-          if (fields.length > 0) {
-            let field = fields[0].field;
-            if (field.selectField) {
-              mode = cnFlexFormService
-                .parseExpression(`__batchConfig["${field.selectDisplayKey}"]`, this.model)
-                .get();
-            }
-          }
-
           this.setValue(val, update, original, mode, this.model);
         }
       });
