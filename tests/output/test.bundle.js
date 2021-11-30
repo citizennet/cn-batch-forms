@@ -11087,6 +11087,12 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           this.fieldRegister[child.key].field = child;
           this.fieldRegister[child.key].dirtyCheck = dirtyCheck;
           this.fieldRegister[child.key].wrapper = fields[i];
+          if (child.link) {
+            this.fieldRegister[child.link] = {};
+            this.fieldRegister[child.link].dirtyCheck = dirtyCheck;
+            this.fieldRegister[child.link].field = child;
+            this.fieldRegister[child.link].wrapper = fields[i];
+          }
         }
       }
       if (!child) {
@@ -11266,15 +11272,9 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
   function createDirtyCheck(field) {
     var _this3 = this;
 
-    //let path = sfPath.parse(field.key);
-    if (!field.schema) {
-      field.schema = cnFlexFormService.getSchema(field.realKey || field.link, this.schema.schema.properties);
-    }
     var key = '__dirtyCheck["' + (field.key || field.batchConfig.key) + '"]';
-    //let child = path.length > 1;
     var htmlClass = '';
 
-    //if(child) htmlClass += ' semi-transparent';
     if (field.notitle || !field.schema.title) htmlClass += ' notitle';
 
     var dirtyCheck = {
@@ -11283,10 +11283,8 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
       type: 'cn-dirty-check',
       watch: [{
         resolution: function resolution(val) {
-          //$timeout(() => {
           _this3.setValidation(field, val);
           $rootScope.$broadcast('schemaFormValidate');
-          //});
         }
       }]
     };
@@ -11298,7 +11296,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
 
     dirtyCheck.fieldWatch = {
       resolution: function resolution(val) {
-        var register = _this3.fieldRegister[field._key || field.realKey || field.link];
+        var register = _this3.fieldRegister[field._key || field.link];
         if (register) {
           if (_.get(register, 'ngModel.$dirty')) {
             cnFlexFormService.parseExpression(key, _this3.model).set(true);
@@ -11427,7 +11425,7 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
     var service = this;
 
     _.each(this.fieldRegister, function (register, key) {
-      var configKeyBase = register.field.parent || key;
+      var configKeyBase = register.field.selectDisplay ? register.field._key : key;
       var dirty = cnFlexFormService.parseExpression('__dirtyCheck["' + configKeyBase + '"]', _this6.model).get();
 
       if (!dirty) return;
@@ -11457,14 +11455,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           var _val = cnFlexFormService.parseExpression(key, _this6.model).get();
           var update = cnFlexFormService.parseExpression(key, models[i]);
           var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
-          var fields = service.getFormFromRegister(key);
-          if (fields.length > 0) {
-            var field = fields[0].field;
-            if (field.selectField) {
-              mode = cnFlexFormService.parseExpression('__batchConfig["' + field.selectDisplayKey + '"]', _this6.model).get();
-            }
-          }
-
           _this6.setValue(_val, update, original, mode, _this6.model);
         }
       });
