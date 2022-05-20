@@ -387,6 +387,7 @@ function cnBatchForms(
             .value();
           _.forEach(externalFields, processField.bind(this))
           _.forEach(externalFields, createBatchField.bind(this))
+          _.forEach(externalFields, createDirtyCheck.bind(this))
         }
 
         return handler.bind(this)(field);
@@ -416,7 +417,6 @@ function cnBatchForms(
           field.batchConfig.watch.push({
             resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
           });
-          //item.items[2].condition = 'false';
           if(item.items.lenth > 2) {
             item.items[2].htmlClass = 'hide';
 					}
@@ -543,16 +543,16 @@ function cnBatchForms(
 
     dirtyCheck.fieldWatch = {
       resolution: (val) => {
-          const register = this.fieldRegister[field._key || field.link];
-          if(register) {
-            if(_.get(register, 'ngModel.$dirty')) {
-              cnFlexFormService.parseExpression(key, this.model).set(true);
-            }
+        let register = this.fieldRegister[field._key || field.parent];
+        if(register) {
+          if(_.get(register, 'ngModel.$dirty')) {
+            cnFlexFormService.parseExpression(key, this.model).set(true);
           }
-          // debug
-          else {
-            console.debug('no register:', field, this.fieldRegister);
-          }
+        }
+        // debug
+        else {
+          console.debug('no register:', field, this.fieldRegister);
+        }
       }
     };
 
@@ -663,7 +663,7 @@ function cnBatchForms(
     let service = this;
 
     _.each(this.fieldRegister, (register, key) => {
-      let configKeyBase = register.field.selectDisplay ? register.field._key : key;
+      let configKeyBase = register.field._key || register.field.parent;
       let dirty = cnFlexFormService
           .parseExpression(`__dirtyCheck["${configKeyBase}"]`, this.model)
           .get();
