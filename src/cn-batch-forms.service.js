@@ -417,12 +417,6 @@ function cnBatchForms(
           field.batchConfig.watch.push({
             resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
           });
-          // if (child.key !== child._key) {
-          //   field.batchConfig.watch.push({
-          //     resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
-          //   });
-          // }
-          //item.items[2].condition = 'false';
           if(item.items.lenth > 2) {
             item.items[2].htmlClass = 'hide';
 					}

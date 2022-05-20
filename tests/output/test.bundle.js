@@ -11063,7 +11063,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
             this.fieldRegister[child.link].dirtyCheck = dirtyCheck;
             this.fieldRegister[child.link].field = child;
             this.fieldRegister[child.link].wrapper = fields[i];
-            console.log(child);
           }
         }
       }
@@ -11109,7 +11108,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           _.forEach(externalFields, processField.bind(this));
           _.forEach(externalFields, createBatchField.bind(this));
           _.forEach(externalFields, createDirtyCheck.bind(this));
-          // externalFields.forEach(function (f) {console.log(f)});
         }
 
         return handler.bind(this)(field);
@@ -11138,12 +11136,6 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           field.batchConfig.watch.push({
             resolution: 'model.__batchConfig["' + child.key + '"] = model.__batchConfig["' + field.batchConfig.key + '"]'
           });
-          // if (child.key !== child._key) {
-          //   field.batchConfig.watch.push({
-          //     resolution: `model.__batchConfig["${child.key}"] = model.__batchConfig["${field.batchConfig.key}"]`
-          //   });
-          // }
-          //item.items[2].condition = 'false';
           if (item.items.lenth > 2) {
             item.items[2].htmlClass = 'hide';
           }
