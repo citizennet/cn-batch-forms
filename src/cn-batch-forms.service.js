@@ -68,7 +68,7 @@ export function processSchemaDiff(service, schema, links, key="") {
 
 export function processFormDiff(service, updates) {
   _.each(updates, (update, key) => {
-    if (!update.batchConfig) return;
+    // if (!update.batchConfig) return;
     const forms = service.getFormFromRegister(key);
     _.each(forms, ({ wrapper }) => {
       if (wrapper && _.has(update, 'condition')) {
