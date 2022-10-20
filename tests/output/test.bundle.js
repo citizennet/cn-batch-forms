@@ -10814,7 +10814,7 @@ function processSchemaDiff(service, schema, links) {
 
 function processFormDiff(service, updates) {
   _.each(updates, function (update, key) {
-    if (!update.batchConfig) return;
+    // if (!update.batchConfig) return;
     var forms = service.getFormFromRegister(key);
     _.each(forms, function (_ref) {
       var wrapper = _ref.wrapper;
