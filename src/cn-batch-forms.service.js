@@ -821,7 +821,7 @@ function cnBatchForms(
 
       config.default = config.default || 'replace';
 
-      if(_.allEqual(config.ogValues)) {
+      if(_.allEqual(config.ogValues, ['popularity'])) {
         // fucking angular infdigs
         $timeout(() =>
           cnFlexFormService.parseExpression(field.key, this.model).set(_.first(angular.copy(config.ogValues)), { silent: true })
