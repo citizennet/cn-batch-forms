@@ -387,7 +387,7 @@ function processCondition(condition) {
       phrase = phrase.slice(0, phrase.lastIndexOf('.'));
     }
     var key = phrase.slice(6);
-    condition = condition.replaceAll(phrase, '(' + phrase + ' === undefined ? model.__ogValues["' + key + '"] : ' + phrase + ')');
+    condition = condition.replaceAll(phrase, '(_.isEmpty(' + phrase + ') ? model.__ogValues[\'' + key + '\'] : ' + phrase + ')');
   });
   return condition;
 }
