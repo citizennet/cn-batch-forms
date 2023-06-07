@@ -10828,11 +10828,20 @@ function processFormDiff(service, updates) {
 }
 
 function setValue(ffService) {
-  return function (val, update, original, mode, model) {
+  return function (val, update, original, mode, model, index) {
+    // originalVal will be used for all append, prefend, and strReplace
+    var originalVal = original.get() || "";
+
+    // should work only for goal_notes;
+    var selectedOriginalKey = original.path().key;
+    if (selectedOriginalKey === 'options.performance_goal_options.goal_notes') {
+      var originalNotes = model.__ogValues[selectedOriginalKey];
+      originalVal = originalNotes[index];
+    }
+
     if (mode === 'replace') {
       update.set(val);
     } else if (mode === 'append') {
-      var originalVal = original.get();
       if (_.isArray(originalVal)) {
         var uniqVal = _([]).concat(originalVal, val).uniq(function (v) {
           return v.key || angular.toJson(v);
@@ -10851,14 +10860,13 @@ function setValue(ffService) {
         update.set(val);
       }
     } else if (mode === 'prepend') {
-      var _originalVal = original.get();
-      if (_.isArray(_originalVal)) {
-        var _uniqVal = _([]).concat(val, _originalVal).uniq(function (v) {
+      if (_.isArray(originalVal)) {
+        var _uniqVal = _([]).concat(val, originalVal).uniq(function (v) {
           return v.key || angular.toJson(v);
         }).value();
         update.set(_uniqVal);
-      } else if (_.isString(_originalVal)) {
-        var _updateVal = val ? val.trim() + ' ' + _originalVal : _originalVal;
+      } else if (_.isString(originalVal)) {
+        var _updateVal = val ? val.trim() + ' ' + originalVal : originalVal;
         update.set(_updateVal);
       } else {
         update.set(val);
@@ -10868,25 +10876,24 @@ function setValue(ffService) {
     } else if (mode === 'decrease') {
       update.set(_.subtract(original.get() || 0, val));
     } else if (mode === 'stringReplace' && original.get()) {
-      var _originalVal2 = original.get();
       var key = original.path().key;
       var replaceStr = ffService.parseExpression('__replace_' + key, model).get();
       var replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
       var withStr = ffService.parseExpression('__with_' + key, model).get() || '';
-      if (_.isArray(_originalVal2)) {
-        var index = -1;
-        if ((index = _.findIndex(_originalVal2, { name: replaceStr })) != -1) {
-          _originalVal2.splice(index, 1, { name: withStr });
-        } else if ((index = _.findIndex(_originalVal2, { value: replaceStr })) != -1) {
-          _originalVal2.splice(index, 1, { value: withStr });
-        } else if ((index = _.findIndex(_originalVal2, { tagName: replaceStr })) != -1) {
-          _originalVal2.splice(index, 1, { tagName: withStr });
-        } else if ((index = _.findIndex(_originalVal2, replaceStr)) != -1) {
-          _originalVal2.splice(index, 1, withStr);
+      if (_.isArray(originalVal)) {
+        var _index = -1;
+        if ((_index = _.findIndex(originalVal, { name: replaceStr })) != -1) {
+          originalVal.splice(_index, 1, { name: withStr });
+        } else if ((_index = _.findIndex(originalVal, { value: replaceStr })) != -1) {
+          originalVal.splice(_index, 1, { value: withStr });
+        } else if ((_index = _.findIndex(originalVal, { tagName: replaceStr })) != -1) {
+          originalVal.splice(_index, 1, { tagName: withStr });
+        } else if ((_index = _.findIndex(originalVal, replaceStr)) != -1) {
+          originalVal.splice(_index, 1, withStr);
         }
-        update.set(_originalVal2);
+        update.set(originalVal);
       } else {
-        var _updateVal2 = replaceStr ? _originalVal2.replace(replaceExp, withStr).trim() : _originalVal2;
+        var _updateVal2 = replaceStr ? originalVal.replace(replaceExp, withStr).trim() : originalVal;
         update.set(_updateVal2);
       }
     }
@@ -10901,7 +10908,8 @@ function processCondition(condition) {
       phrase = phrase.slice(0, phrase.lastIndexOf('.'));
     }
     var key = phrase.slice(6);
-    condition = condition.replaceAll(phrase, '(_.isEmpty(' + phrase + ') ? model.__ogValues[\'' + key + '\'] : ' + phrase + ')');
+    var regex = new RegExp(_.escapeRegExp(phrase), 'g');
+    condition = condition.replace(regex, '(' + phrase + ' === undefined ? model.__ogValues["' + key + '"] : ' + phrase + ')');
   });
   return condition;
 }
@@ -11097,6 +11105,12 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           var key = '__ogValues["' + field.key + '"]';
           var first = _.first(field.batchConfig.ogValues);
           cnFlexFormService.parseExpression(key, this.model).set(first);
+        }
+
+        // need to add original notes to model
+        if (field._key === 'options.performance_goal_options.goal_notes') {
+          var _key = '__ogValues["' + field.key + '"]';
+          cnFlexFormService.parseExpression(_key, this.model).set(this.getModelValues(field));
         }
 
         if (field.items) {
@@ -11426,11 +11440,10 @@ function cnBatchForms(cnFlexFormConfig, cnFlexFormService, cnFlexFormTypes, sfPa
           var _val = cnFlexFormService.parseExpression(key, _this6.model).get();
           var update = cnFlexFormService.parseExpression(key, models[i]);
           var original = cnFlexFormService.parseExpression(key, _this6.models[i]);
-          _this6.setValue(_val, update, original, mode, _this6.model);
+          _this6.setValue(_val, update, original, mode, _this6.model, i);
         }
       });
     });
-
     return models;
   }
 
