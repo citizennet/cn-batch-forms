@@ -80,12 +80,21 @@ export function processFormDiff(service, updates) {
 }
 
 export function setValue(ffService) {
-  return function(val, update, original, mode, model) {
+  return function(val, update, original, mode, model, index) {
+    // originalVal will be used for all append, prefend, and strReplace
+    let originalVal = original.get() || ""; 
+
+    // should work only for goal_notes;
+    const selectedOriginalKey = original.path().key;
+    if (selectedOriginalKey === 'options.performance_goal_options.goal_notes') {
+      let originalNotes = model.__ogValues[selectedOriginalKey];
+      originalVal = originalNotes[index];
+    }
+
     if(mode === 'replace') {
       update.set(val);
     }
     else if(mode === 'append') {
-      let originalVal = original.get();
       if(_.isArray(originalVal)) {
         const uniqVal = _([])
           .concat(originalVal, val)
@@ -111,7 +120,6 @@ export function setValue(ffService) {
       }
     }
     else if(mode === 'prepend') {
-      let originalVal = original.get();
       if(_.isArray(originalVal)) {
         const uniqVal = _([])
           .concat(val, originalVal)
@@ -136,7 +144,6 @@ export function setValue(ffService) {
       update.set(_.subtract(original.get() || 0, val));
     }
     else if(mode === 'stringReplace' && original.get()) {
-      let originalVal = original.get();
       const key = original.path().key;
       const replaceStr = ffService.parseExpression(`__replace_${key}`, model).get();
       const replaceExp = new RegExp(_.escapeRegExp(replaceStr), 'gi');
@@ -172,7 +179,8 @@ export function processCondition(condition) {
       phrase = phrase.slice(0, phrase.lastIndexOf('.'));
     }
     let key = phrase.slice(6);
-    condition = condition.replaceAll(phrase, `(_.isEmpty(${phrase}) ? model.__ogValues['${key}'] : ${phrase})`);
+    var regex = new RegExp(_.escapeRegExp(phrase), 'g');
+    condition = condition.replace(regex, `(${phrase} === undefined ? model.__ogValues["${key}"] : ${phrase})`);
   });
   return condition;
 }
@@ -376,6 +384,12 @@ function cnBatchForms(
           let key = `__ogValues["${field.key}"]`;
           let first = _.first(field.batchConfig.ogValues);
           cnFlexFormService.parseExpression(key, this.model).set(first);
+        }
+        
+        // need to add original notes to model
+        if (field._key === 'options.performance_goal_options.goal_notes') {
+          let key = `__ogValues["${field.key}"]`;
+          cnFlexFormService.parseExpression(key, this.model).set(this.getModelValues(field));
         }
 
         if(field.items) {
@@ -702,11 +716,10 @@ function cnBatchForms(
           let val = cnFlexFormService.parseExpression(key, this.model).get();
           let update = cnFlexFormService.parseExpression(key, models[i]);
           let original = cnFlexFormService.parseExpression(key, this.models[i]);
-          this.setValue(val, update, original, mode, this.model);
+          this.setValue(val, update, original, mode, this.model, i);
         }
       });
     });
-
     return models;
   }
 
